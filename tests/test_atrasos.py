@@ -74,6 +74,8 @@ class AtrasoHTTPTests(unittest.TestCase):
             db.execute("UPDATE movimentacoes_emprestimo SET valor_centavos=1000000,saldo_depois_centavos=1000000,data_movimento=? WHERE tipo='EMPRESTIMO'",((self.today-timedelta(days=120)).isoformat(),))
             self.tid=self.insert_title(db,self.due)
             self.future_ids=[self.insert_title(db,application.add_months_iso(self.due,m)) for m in [1,2]]
+            application.sync_receivable_titles(db,months_ahead=2)
+            self.future_ids=[r[0] for r in db.execute('SELECT id FROM titulos_receber WHERE id<>? ORDER BY id',(self.tid,)).fetchall()]
             db.commit()
 
     def tearDown(self):self.c.tearDown()
