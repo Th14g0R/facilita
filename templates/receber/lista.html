@@ -1,0 +1,31 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}A receber{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>A receber</h1>
+</div>
+<div class="actions">
+<a class="button primary" href="{{ url_for('pagamentos_integrados_novo') }}">Registrar pagamento</a>
+</div>
+</header>
+<section class="panel">
+<form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}<label class="field">
+<span>Situação</span>
+<select name="status">
+<option value="abertos" {% if request.args.get("status",'abertos')=='abertos' %}selected{% endif %}>Em aberto</option>
+<option value="vencido" {% if request.args.get("status",'abertos')=='vencido' %}selected{% endif %}>Vencidos</option>
+<option value="recebido" {% if request.args.get("status",'abertos')=='recebido' %}selected{% endif %}>Recebidos</option>
+<option value="parcial" {% if request.args.get("status",'abertos')=='parcial' %}selected{% endif %}>Parciais históricos</option>
+<option value="todos" {% if request.args.get("status",'abertos')=='todos' %}selected{% endif %}>Todos</option>
+</select>
+</label>{{ field("data_inicio","De",request.args.get("data_inicio",""),type="date") }}{{ field("data_fim","Até",request.args.get("data_fim",""),type="date") }}<button class="button">Filtrar</button>
+<a href="{{ request.path }}">Limpar</a>
+</form>{{ table(titulos,[('cliente_nome', 'Cliente'), ('emprestimo_id', 'Contrato'), ('competencia', 'Competência'), ('data_vencimento', 'Vencimento'), ('valor_previsto_centavos', 'Valor do título'), ('status', 'Situação')],'titulos_receber_detalhe','titulo_id') }}</section>
+<details class="panel">
+<summary>Reagendar títulos em aberto</summary>
+<form method="post" action="{{ url_for('titulos_receber_lote') }}">{{ csrf() }}<p class="muted">Selecione títulos para conferir a prévia antes de confirmar.</p>{% for t in titulos if t.status in ['PREVISTO','VENCIDO'] and t.natureza=='JUROS' %}<label class="check">
+<input type="checkbox" name="titulo_id" value="{{ t.id }}">#{{ t.id }} · {{ t.cliente_nome }} · {{ t.competencia|competencia_br }} · {{ t.data_vencimento|date_br }} · {{ t.valor_previsto_centavos|money }}</label>{% endfor %}<button class="button">Configurar reagendamento</button>
+</form>
+</details>
+<p class="muted">Até 500 títulos por consulta. Use os filtros para localizar um período específico.</p>
+<a href="{{ url_for('titulos_receber_relatorio') }}">Relatório de cobrança por cliente →</a>{% endblock %}

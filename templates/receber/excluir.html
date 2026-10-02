@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Excluir título{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Excluir título</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">{{ table([titulo],[('id', 'Título'), ('cliente_nome', 'Cliente'), ('competencia', 'Competência'), ('valor_previsto_centavos', 'Valor')]) }}<p class="alert warning">Confira o registro antes de continuar. A exclusão terá auditoria e poderá recalcular os saldos relacionados.</p>
+<form method="post" data-confirm="Confirmar a exclusão financeira?">{{ csrf() }}{{ confirmation("motivo_exclusao") }}<button class="button danger">Confirmar exclusão</button>
+</form>
+</section>{% endblock %}

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Nova compra · {{ cartao.descricao }}{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Nova compra · {{ cartao.descricao }}</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<form method="post">{{ csrf() }}<div class="form-grid">{% for key,label,type in [('descricao','Descrição','text'),('valor_total','Total da compra (R$)','text'),('quantidade_parcelas','Quantidade de parcelas','number'),('data_compra','Data da compra','date'),('primeiro_vencimento','Primeiro vencimento','date')] %}{{ field(key,label,form[key],type=type,required=true) }}{% endfor %}</div>
+<button class="button primary">Registrar compra</button>
+</form>
+</section>{% endblock %}

@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Bem-vindo de volta{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Bem-vindo de volta</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel auth-panel">
+<p class="muted">Organize contratos, recebimentos e clientes em um só lugar.</p>
+<form method="post">{{ csrf() }}{{ field('login','Login',request.form.get('login',''),required=true) }}{{ field('senha','Senha',type='password',required=true) }}<button class="button primary">Entrar</button>
+</form>
+<p>
+<a href="{{ url_for('portal.login') }}">Sou cliente →</a>
+</p>
+</section>{% endblock %}

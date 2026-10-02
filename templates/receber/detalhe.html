@@ -1,0 +1,20 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, table, csrf, banks with context %}
+{% block title %}Título #{{ titulo.id }}{% endblock %}{% block content %}
+<header class="page-heading"><div><p class="eyebrow">RECEBIMENTO</p><h1>Título #{{ titulo.id }}</h1></div></header>
+<section class="panel"><h2>{{ titulo.cliente_nome }} · Contrato #{{ titulo.emprestimo_id }}</h2>
+<p>Competência {{ titulo.competencia|competencia_br }} · Vencimento agendado {{ titulo.data_vencimento|date_br }} · <span class="badge">{{ titulo.status|titulo_status }}</span></p>
+{% if titulo.status in ['PREVISTO','VENCIDO'] %}
+<form method="post">{{ csrf() }}
+{{ field('data_recebimento','Data efetiva do pagamento',form.data_recebimento,type='date',required=true) }}
+<button class="button" name="acao" value="prever" formnovalidate>Recalcular para esta data</button>
+{% include 'receber/_atraso.html' %}
+<input type="hidden" name="assinatura" value="{{ assinatura }}">
+{{ banks(form,contas_cliente,contas_proprias) }}{{ field('observacao','Observação',form.observacao,type='textarea') }}
+{% if planos %}<button class="button primary" name="acao" value="confirmar">Confirmar recebimento de {{ resumo_atraso.valor_total_centavos|money }}</button>{% endif %}
+</form>
+{% elif planos %}<h3>Detalhamento registrado no pagamento</h3>{% include 'receber/_atraso.html' %}
+{% else %}<p>Valor registrado: <strong>{{ titulo.valor_recebido_centavos|money }}</strong>. Este registro anterior à atualização não possui detalhamento de atraso.</p>{% endif %}
+</section>
+{% if titulos_saldo %}<section class="panel"><h2>Saldos históricos vinculados</h2>{{ table(titulos_saldo,[('id','Título'),('valor_previsto_centavos','Valor'),('status','Situação')],'titulos_receber_detalhe','titulo_id') }}</section>{% endif %}
+<div class="actions"><a href="{{ url_for('titulos_receber_editar',titulo_id=titulo.id) }}">Corrigir título</a><a href="{{ url_for('titulos_receber_excluir',titulo_id=titulo.id) }}">Excluir título</a></div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Comprovante #{{ comprovante.id }}{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Comprovante #{{ comprovante.id }}</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<h2>{{ comprovante.cliente_nome }}</h2>
+<p>{{ comprovante.data_pagamento|date_br }} · <strong>{{ comprovante.valor_total_centavos|money }}</strong> · {{ comprovante.status }}</p>
+<a class="button" href="{{ url_for('portal.admin_file',pid=comprovante.id) }}" target="_blank" rel="noopener">Abrir arquivo</a>{{ table(itens,[('emprestimo_id','Contrato'),('competencia','Competência'),('valor_centavos','Valor')]) }}{% include 'receber/_atraso.html' %}{% if divergencia %}<p class="alert warning">O valor enviado diverge do total calculado. Confira com o cliente antes de confirmar; a baixa será bloqueada enquanto houver diferença.</p>{% endif %}{% if comprovante.status=='EM_ANALISE' %}<form method="post" action="{{ url_for('portal.confirm_proof',pid=comprovante.id) }}" data-confirm="Confirmar o comprovante e registrar os recebimentos?">{{ csrf() }}<input type="hidden" name="assinatura" value="{{ assinatura }}">{{ banks({},contas_cliente,contas_proprias) }}{{ field('observacao_admin','Observação') }}{{ field('senha_confirmacao','Sua senha atual',type='password',required=true) }}<button class="button primary">Confirmar e receber</button>
+</form>
+<details>
+<summary>Rejeitar comprovante</summary>
+<form method="post" action="{{ url_for('portal.reject_proof',pid=comprovante.id) }}">{{ csrf() }}{{ field('observacao_admin','Motivo da rejeição',required=true) }}{{ field('senha_confirmacao','Sua senha atual',type='password',required=true) }}<button class="button danger">Rejeitar</button>
+</form>
+</details>{% endif %}</section>{% endblock %}

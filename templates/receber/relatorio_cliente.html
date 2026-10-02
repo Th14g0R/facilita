@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Relatório de cobrança{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Relatório de cobrança</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<form method="get" class="filters">{{ select('cliente_id','Cliente',clientes,cliente.id if cliente else '') }}{{ field('data_inicio','De',data_inicio,type='date') }}{{ field('data_fim','Até',data_fim,type='date') }}<button class="button">Consultar</button>
+</form>
+</section>
+<section class="panel">{{ table(titulos,[('emprestimo_id','Contrato'),('competencia','Competência'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')],'titulos_receber_detalhe','titulo_id') }}{% if mensagem_cobranca %}<h2>Mensagem de cobrança</h2>
+<pre>{{ mensagem_cobranca }}</pre>{% if whatsapp_url %}<a class="button" href="{{ whatsapp_url }}" target="_blank" rel="noopener">Abrir WhatsApp</a>{% endif %}{% endif %}</section>{% endblock %}

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Gerenciar acesso{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Gerenciar acesso</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<h2>{{ acesso.cliente_nome }}</h2>
+<form method="post">{{ csrf() }}<div class="form-grid">{{ field('email','E-mail',form.email,type='email',required=true) }}{{ field('telefone','Telefone',form.telefone) }}{{ select('status','Situação',[{'id':'PENDENTE','nome':'Pendente'},{'id':'ATIVO','nome':'Ativo'},{'id':'BLOQUEADO','nome':'Inativo'},{'id':'REJEITADO','nome':'Rejeitado'}],form.status) }}</div>{{ field('nova_senha','Nova senha (opcional, mínimo 10 caracteres)',type='password') }}{{ field('confirmar_nova_senha','Confirmar nova senha',type='password') }}{{ field('observacao_admin','Observação',form.observacao_admin,type='textarea') }}{{ field('senha_confirmacao','Sua senha atual',type='password',required=true) }}<button class="button primary">Salvar acesso</button>
+</form>
+</section>{% endblock %}

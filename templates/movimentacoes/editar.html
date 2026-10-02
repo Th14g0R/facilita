@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Corrigir movimentação{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Corrigir movimentação</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<form method="post">{{ csrf() }}<div class="form-grid">{{ field('data_movimento','Data',form.data_movimento,type='date') }}{{ field('competencia','Competência (juros)',form.competencia,type='month') }}{{ field('valor','Valor (somente abatimento)',form.valor,type='text') }}{{ field('observacao','Observação',form.observacao,type='textarea') }}</div>{{ banks(form,contas_proprias if movimento.tipo=="EMPRESTIMO" else contas_cliente,contas_cliente if movimento.tipo=="EMPRESTIMO" else contas_proprias) }}{{ confirmation('motivo_correcao') }}<button class="button primary">Confirmar correção</button>
+</form>
+</section>
+<a href="{{ url_for('movimentacoes_excluir',movimentacao_id=movimento.id) }}">Excluir movimentação com auditoria</a>{% endblock %}

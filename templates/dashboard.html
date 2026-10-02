@@ -1,0 +1,105 @@
+{% extends 'base.html' %}{% from '_macros.html' import table, csrf with context %}
+{% block title %}Visão geral{% endblock %}{% block content %}
+<header class="page-heading">
+<div>
+<p class="eyebrow">SEU NEGÓCIO EM DIA</p>
+<h1>Visão geral</h1>
+<p class="muted">Acompanhe sua carteira e os próximos recebimentos.</p>
+</div>
+<div class="actions">
+<a class="button" href="{{ url_for('emprestimos_novo') }}">Novo empréstimo</a>
+<a class="button primary" href="{{ url_for('pagamentos_integrados_novo') }}">Registrar pagamento</a>
+</div>
+</header>
+{% if painel.conflitos_historicos %}<div class="alert warning" role="alert">Há {{ painel.conflitos_historicos }} ocorrências históricas de juros duplicados ou saldos parciais para conferir. Os registros foram preservados. Novos recebimentos seguem a regra de juros integrais e únicos por competência.</div>{% endif %}
+<div class="metrics">
+<a class="metric featured" href="{{ url_for('emprestimos_lista',status='ativos') }}">
+<span>Principal em aberto</span>
+<strong>{{ metrics.saldo_devedor_centavos|money }}</strong>
+<small>{{ metrics.emprestimos_ativos }} contratos ativos · sem juros e cartões</small>
+</a>
+<a class="metric" href="{{ url_for('movimentacoes_lista',tipo='juros',data_inicio=mes_atual~'-01',data_fim=painel.inicio) }}">
+<span>Juros recebidos no mês</span>
+<strong>{{ metrics.juros_mes_centavos|money }}</strong>
+<small>{{ mes_atual|competencia_br }} · por data de recebimento</small>
+</a>
+<a class="metric overdue" href="{{ url_for('titulos_receber_lista',status='vencido') }}">
+<span>Juros vencidos</span>
+<strong>{{ painel.vencido|money }}</strong>
+<small>{{ painel.titulos_vencidos }} títulos aguardando recebimento</small>
+</a>
+<a class="metric" href="{{ url_for('titulos_receber_lista',status='abertos',data_inicio=painel.inicio,data_fim=painel.fim) }}">
+<span>Juros a vencer em 7 dias</span>
+<strong>{{ painel.proximos|money }}</strong>
+<small>Inclui os vencimentos de hoje</small>
+</a>
+</div>
+<div class="dashboard-grid">
+<div>
+<section class="panel">
+<div class="panel-heading">
+<h2>Prioridades de recebimento</h2>
+<a href="{{ url_for('titulos_receber_lista') }}">Ver todos →</a>
+</div>{{ table(proximos_titulos,[('cliente_nome','Cliente'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')],'titulos_receber_detalhe','titulo_id',empty='Tudo em dia. Os próximos títulos aparecerão aqui.') }}</section>
+<section class="panel">
+<div class="panel-heading">
+<h2>Últimos recebimentos de empréstimos</h2>
+<a href="{{ url_for('movimentacoes_lista') }}">Ver histórico →</a>
+</div>{{ table(ultimas_movimentacoes,[('cliente_nome','Cliente'),('data_movimento','Data'),('tipo','Tipo'),('valor_centavos','Recebido')],'movimentacoes_editar','movimentacao_id',empty='Ainda não há recebimentos registrados.') }}</section>
+</div>
+<div>
+<section class="panel">
+<h2>Precisa da sua atenção</h2>
+<a class="task" href="{{ url_for('portal.admin_proofs',status='EM_ANALISE') }}">
+<span>Comprovantes para analisar</span>
+<strong>{{ painel.comprovantes_pendentes }}</strong>
+</a>
+<a class="task" href="{{ url_for('portal.admin_accesses',status='PENDENTE') }}">
+<span>Solicitações de acesso</span>
+<strong>{{ painel.acessos_pendentes }}</strong>
+</a>
+<a class="task" href="{{ url_for('titulos_receber_lista',status='vencido') }}">
+<span>Títulos vencidos</span>
+<strong>{{ painel.titulos_vencidos }}</strong>
+</a>
+</section>
+<section class="panel">
+<h2>Evolução dos juros recebidos</h2>
+<p class="muted">Últimos seis meses · regime de caixa</p>
+<div class="chart-bars" role="img" aria-label="Juros recebidos nos últimos seis meses: {% for m in painel.meses %}{{ m.mes|competencia_br }}: {{ m.valor|money }}; {% endfor %}">
+{% for m in painel.meses %}
+<div class="chart-column" title="{{ m.mes|competencia_br }}: {{ m.valor|money }}">
+<span class="chart-value">{{ m.valor|money }}</span>
+<div class="bar-track">
+<span class="bar" style="height:{{ [m.altura, 4]|max if m.valor > 0 else 0 }}%;"></span>
+</div>
+<small>{{ m.mes|competencia_br }}</small>
+</div>
+{% endfor %}
+</div>
+
+</section>
+<section class="panel">
+<h2>Cartões</h2>
+<a class="task" href="{{ url_for('cartoes_lista',status='todos') }}">
+<span>Parcelas em aberto</span>
+<strong>{{ painel.cartoes_aberto|money }}</strong>
+</a>
+<div class="task">
+<span>Recebido neste mês</span>
+<strong>{{ painel.cartoes_recebido|money }}</strong>
+</div>
+<p class="muted">Apresentados separadamente dos empréstimos.</p>
+</section>
+</div>
+</div>
+<section class="panel">
+<div class="panel-heading">
+<h2>Contexto da carteira</h2>
+<form method="post" action="{{ url_for('atualizar_agenda') }}">{{ csrf() }}<button class="button">Atualizar agenda</button>
+</form>
+</div>
+<p class="muted">{{ metrics.clientes_ativos }} clientes ativos · {{ metrics.total_emprestado_centavos|money }} emprestados desde o início (inclui contratos quitados).</p>
+<p>Entradas de empréstimos no mês: <strong>{{ metrics.recebimentos_mes_centavos|money }}</strong>. Incluem juros e devolução de principal; não representam lucro.</p>
+</section>
+{% endblock %}

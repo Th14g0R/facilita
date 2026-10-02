@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Meus comprovantes{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Meus comprovantes</h1>
+</div>
+<div class="actions">
+<a class="button primary" href="{{ url_for('portal.new_proof') }}">Enviar comprovante</a>
+</div>
+</header>
+<section class="panel">
+<form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}<button class="button">Filtrar</button>
+<a href="{{ request.path }}">Limpar</a>
+</form>{{ table(comprovantes,[('id', 'Comprovante'), ('data_pagamento', 'Pagamento'), ('valor_total_centavos', 'Valor'), ('status', 'Situação'), ('observacao_admin', 'Resposta')],'portal.client_file','proof_id') }}</section>{% endblock %}

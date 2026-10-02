@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Corrigir título{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Corrigir título</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<form method="post">{{ csrf() }}<div class="form-grid">{{ field('competencia','Competência',form.competencia,type='month') }}{{ field('data_vencimento','Vencimento',form.data_vencimento,type='date') }}{{ field('valor_previsto','Valor previsto (R$)',form.valor_previsto,type='text') }}{{ field('observacao','Observação',form.observacao,type='textarea') }}</div>{{ confirmation('motivo_alteracao') }}<button class="button primary">Confirmar correção</button>
+</form>
+</section>{% endblock %}

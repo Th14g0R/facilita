@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}{{ cartao.descricao }}{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>{{ cartao.descricao }}</h1>
+</div>
+<div class="actions">
+<a class="button primary" href="{{ url_for('cartoes_lancamento_novo',cartao_id=cartao.id) }}">Nova compra</a>
+</div>
+</header>
+<section class="panel">
+<h2>{{ cartao.cliente_nome }}</h2>
+<p>Em aberto: <strong>{{ resumo.aberto_centavos|money }}</strong> · Recebido: {{ resumo.pago_centavos|money }} · Vencido: {{ resumo.vencido_centavos|money }}</p>
+<a href="{{ url_for('cartoes_editar',cartao_id=cartao.id) }}">Editar cartão</a>
+</section>
+<section class="panel">
+<h2>Parcelas</h2>{{ table(parcelas,[('numero_parcela','Parcela'),('lancamento_descricao','Compra'),('vencimento','Vencimento'),('valor_centavos','Valor'),('status','Situação')],'parcelas_cartao_pagar','parcela_id') }}</section>
+<section class="panel">
+<h2>Compras</h2>{{ table(lancamentos,[('descricao','Compra'),('valor_total_centavos','Valor total'),('quantidade_parcelas','Parcelas')],'cartoes_lancamento_editar','lancamento_id') }}</section>{% endblock %}

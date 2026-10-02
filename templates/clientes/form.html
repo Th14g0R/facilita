@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}{{ titulo }}{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>{{ titulo }}</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<form method="post">{{ csrf() }}<div class="form-grid">{% for key,label in [('nome','Nome completo'),('cpf','CPF'),('telefone','Telefone'),('email','E-mail'),('endereco','Endereço'),('cidade','Cidade'),('estado','UF'),('cep','CEP')] %}{{ field(key,label,cliente[key]|default(''),required=key in ['nome','cpf']) }}{% endfor %}</div>{{ field('observacoes','Observações',cliente.observacoes|default(''),type='textarea') }}<button class="button primary">Salvar cliente</button>
+</form>
+</section>{% endblock %}

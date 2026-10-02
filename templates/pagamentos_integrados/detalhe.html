@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% from '_macros.html' import table with context %}
+{% block title %}Pagamento #{{ pagamento.id }}{% endblock %}{% block content %}
+<header class="page-heading"><div><p class="eyebrow">RECEBIMENTO CONFIRMADO</p><h1>Pagamento #{{ pagamento.id }}</h1></div></header>
+<section class="panel"><h2>{{ pagamento.cliente_nome }}</h2><p>Pagamento em {{ pagamento.data_pagamento|date_br }} · Total recebido: <strong>{{ pagamento.valor_total_centavos|money }}</strong></p>
+{{ table(itens,[('emprestimo_id','Contrato'),('competencia','Competência'),('data_base_atraso','Vencimento-base'),('valor_base_centavos','Juro original'),('dias_atraso','Dias de atraso'),('juros_atraso_centavos','Adicional de atraso'),('valor_centavos','Total'),('data_calculo_atraso','Pagamento em')]) }}
+<p class="muted">Registros anteriores à atualização não possuem detalhamento de atraso; seu valor recebido foi preservado.</p></section>
+<a href="{{ url_for('pagamentos_integrados_excluir',pagamento_id=pagamento.id) }}">Estornar pagamento com auditoria</a>
+{% endblock %}

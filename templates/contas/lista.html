@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Contas bancárias{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Contas bancárias</h1>
+</div>
+<div class="actions">
+<a class="button primary" href="{{ url_for('contas_nova') }}">Nova conta</a>
+</div>
+</header>
+<section class="panel">
+<form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}<button class="button">Filtrar</button>
+<a href="{{ request.path }}">Limpar</a>
+</form>{{ table(contas,[('banco', 'Banco'), ('tipo_titular', 'Titularidade'), ('cliente_nome', 'Cliente'), ('chave_pix', 'PIX')],'contas_editar','conta_id') }}</section>{% endblock %}

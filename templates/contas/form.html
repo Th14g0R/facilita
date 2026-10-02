@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}{{ titulo }}{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>{{ titulo }}</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<form method="post">{{ csrf() }}<div class="form-grid">{{ select('tipo_titular','Titularidade',[{'id':'NOSSA','nome':'Conta própria'},{'id':'CLIENTE','nome':'Conta de cliente'}],conta.tipo_titular) }}{{ select('cliente_id','Cliente (apenas conta de cliente)',clientes,conta.cliente_id,required=false) }}{% for key,label in [('banco','Banco'),('descricao','Descrição'),('agencia','Agência'),('conta','Conta'),('tipo_conta','Tipo de conta'),('chave_pix','Chave PIX')] %}{{ field(key,label,conta[key]|default(''),required=key=='banco') }}{% endfor %}</div>
+<label class="check">
+<input type="checkbox" name="principal" value="1" {% if conta.principal %}checked{% endif %}>Conta principal</label>
+<button class="button primary">Salvar conta</button>
+</form>
+</section>{% endblock %}

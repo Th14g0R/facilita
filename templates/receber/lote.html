@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, csrf, confirmation with context %}
+{% block title %}Reagendar vencimentos{% endblock %}
+{% block content %}
+<header class="page-heading"><div><p class="eyebrow">AGENDA FINANCEIRA</p><h1>Reagendar vencimentos</h1></div></header>
+<section class="panel">
+<p>Os títulos selecionados recebem o cálculo de atraso até a nova data. Para mudar também o dia dos próximos títulos, marque a opção abaixo: eles serão incluídos na prévia sem adicional.</p>
+<form method="post">{{ csrf() }}
+{% for id in ids %}<input type="hidden" name="titulo_id" value="{{ id }}">{% endfor %}
+<div class="form-grid">{{ field('nova_data','Nova data de pagamento dos selecionados',request.form.get('nova_data',''),type='date') }}{{ field('dia','Ou novo dia em cada mês (1 a 31)',request.form.get('dia',''),type='number') }}</div>
+<label class="check"><input type="checkbox" name="futuros" value="1" {% if request.form.get('futuros')=='1' %}checked{% endif %}>Aplicar o dia aos próximos títulos, sem alterar seus valores</label>
+<button class="button" name="acao" value="prever" formnovalidate>Calcular e conferir prévia</button>
+{% if plano %}
+{% include 'receber/_previa.html' %}
+<input type="hidden" name="assinatura" value="{{ assinatura }}">
+{{ confirmation('motivo') }}
+<button class="button primary" name="acao" value="salvar">Confirmar datas e valores acima</button>
+{% endif %}
+</form></section>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Extrato por cliente{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Extrato por cliente</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<form method="get" class="filters">{{ select('cliente_id','Cliente',clientes,cliente.id if cliente else '') }}{{ field('data_inicio','De',data_inicio,type='date') }}{{ field('data_fim','Até',data_fim,type='date') }}<button class="button">Consultar</button>
+</form>
+</section>{% if cliente %}<section class="panel">
+<h2>{{ cliente.nome }} · Contratos</h2>{{ table(emprestimos,[('id','Contrato'),('valor_original_centavos','Principal original'),('saldo_atual_centavos','Principal atual'),('status','Situação')],'emprestimos_detalhe','emprestimo_id') }}</section>
+<section class="panel">
+<h2>Movimentações no período</h2>{{ table(extrato,[('data_movimento','Data'),('emprestimo_id','Contrato'),('tipo','Tipo'),('valor_centavos','Valor')]) }}</section>{% endif %}{% endblock %}

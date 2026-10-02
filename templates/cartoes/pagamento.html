@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Receber parcela{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Receber parcela</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<p class="callout">Parcela #{{ parcela.numero_parcela }} · <strong>{{ parcela.valor_centavos|money }}</strong>
+</p>
+<form method="post" data-confirm="Confirmar o recebimento da parcela?">{{ csrf() }}{{ field('data_pagamento','Data do pagamento',form.data_pagamento,type='date',required=true) }}{{ banks(form,contas_cliente,contas_proprias) }}{{ field('observacao','Observação',form.observacao,type='textarea') }}<button class="button primary">Confirmar recebimento</button>
+</form>
+</section>{% endblock %}

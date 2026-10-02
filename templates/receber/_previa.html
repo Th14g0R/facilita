@@ -1,0 +1,8 @@
+<h2>Confira o reagendamento</h2>
+{% set planos = plano|rejectattr('somente_dia')|map(attribute='calculo')|list %}
+{% include 'receber/_atraso.html' %}
+{% set proximos = plano|selectattr('somente_dia')|list %}
+{% if dia_futuro %}<p class="callout">Os próximos vencimentos usarão o dia <strong>{{ dia_futuro }}</strong> (ou o último dia do mês, quando necessário). Os valores mensais dos próximos títulos não recebem o adicional deste atraso.</p>{% endif %}
+{% if proximos %}<h3>Próximos títulos: apenas alteração do dia</h3>
+<div class="table-wrap"><table><thead><tr><th>Título / contrato</th><th>Competência</th><th>Vencimento anterior</th><th>Novo vencimento</th><th class="money">Valor mantido</th><th class="money">Adicional</th></tr></thead>
+<tbody>{% for p in proximos %}<tr><td>#{{ p.titulo.id }} / #{{ p.titulo.emprestimo_id }}</td><td>{{ p.titulo.competencia|competencia_br }}</td><td>{{ p.titulo.data_vencimento|date_br }}</td><td>{{ p.nova_data|date_br }}</td><td class="money">{{ p.valor|money }}</td><td class="money">R$ 0,00</td></tr>{% endfor %}</tbody></table></div>{% endif %}

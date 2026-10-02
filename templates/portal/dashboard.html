@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Minha visão geral{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Minha visão geral</h1>
+</div>
+<div class="actions">
+<a class="button primary" href="{{ url_for('portal.new_proof') }}">Enviar comprovante</a>
+</div>
+</header>
+<section class="panel">
+<h2>Meus contratos</h2>{{ table(emprestimos,[('id','Contrato'),('valor_original_centavos','Valor original'),('saldo_atual_centavos','Principal em aberto'),('status','Situação')]) }}</section>
+<section class="panel">
+<h2>Juros a receber</h2>{{ table(titulos,[('emprestimo_id','Contrato'),('competencia','Competência'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')]) }}</section>
+<section class="panel">
+<h2>Meus cartões</h2>{{ table(cartoes,[('descricao','Cartão'),('aberto_centavos','Em aberto'),('pago_centavos','Pago')]) }}</section>{% endblock %}

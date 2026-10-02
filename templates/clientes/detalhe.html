@@ -1,0 +1,26 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}{{ cliente.nome }}{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>{{ cliente.nome }}</h1>
+</div>
+<div class="actions">
+<a class="button primary" href="{{ url_for('emprestimos_novo',cliente_id=cliente.id) }}">Novo empréstimo</a>
+</div>
+</header>
+<section class="panel">
+<p>{{ cliente.cpf }} · {{ cliente.telefone or 'Telefone não informado' }} · {{ cliente.email or 'E-mail não informado' }}</p>
+<div class="actions">
+<a href="{{ url_for('clientes_editar',cliente_id=cliente.id) }}">Editar cadastro</a>
+<a href="{{ url_for('contas_nova',cliente_id=cliente.id) }}">Adicionar conta</a>
+<a href="{{ url_for('relatorio_cliente',cliente_id=cliente.id) }}">Extrato completo</a>
+</div>
+</section>
+<section class="panel">
+<h2>Empréstimos</h2>{{ table(emprestimos,[('id','Contrato'),('valor_original_centavos','Valor original'),('saldo_atual_centavos','Principal em aberto'),('status','Situação')],'emprestimos_detalhe','emprestimo_id') }}</section>
+<section class="panel">
+<h2>Contas bancárias</h2>{{ table(contas_bancarias,[('banco','Banco'),('chave_pix','PIX')],'contas_editar','conta_id') }}</section>
+<section class="panel">
+<h2>Cartões</h2>{{ table(cartoes,[('descricao','Cartão')],'cartoes_detalhe','cartao_id') }}</section>
+<form method="post" action="{{ url_for('clientes_status',cliente_id=cliente.id) }}">{{ csrf() }}<button class="button">{{ 'Inativar' if cliente.ativo else 'Ativar' }} cliente</button>
+</form>{% endblock %}

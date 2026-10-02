@@ -1,0 +1,22 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Cartões{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Cartões</h1>
+</div>
+<div class="actions">
+<a class="button primary" href="{{ url_for('cartoes_novo') }}">Novo cartão</a>
+</div>
+</header>
+<section class="panel">
+<form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}<label class="field">
+<span>Situação</span>
+<select name="status">
+<option value="ativos" {% if request.args.get("status",'ativos')=='ativos' %}selected{% endif %}>Ativos</option>
+<option value="inativos" {% if request.args.get("status",'ativos')=='inativos' %}selected{% endif %}>Inativos</option>
+<option value="todos" {% if request.args.get("status",'ativos')=='todos' %}selected{% endif %}>Todos</option>
+</select>
+</label>
+<button class="button">Filtrar</button>
+<a href="{{ request.path }}">Limpar</a>
+</form>{{ table(cartoes,[('descricao', 'Cartão'), ('cliente_nome', 'Cliente'), ('total_parcelado_centavos', 'Total parcelado'), ('pago_centavos', 'Recebido'), ('aberto_centavos', 'Em aberto')],'cartoes_detalhe','cartao_id') }}</section>{% endblock %}

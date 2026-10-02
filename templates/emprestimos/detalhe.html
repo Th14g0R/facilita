@@ -1,0 +1,30 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Contrato #{{ emprestimo.id }}{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Contrato #{{ emprestimo.id }}</h1>
+</div>
+<div class="actions">
+<a class="button" href="{{ url_for('titulos_receber_lista',emprestimo_id=emprestimo.id) }}">Títulos do contrato</a>
+</div>
+</header>
+<section class="panel">
+<h2>{{ emprestimo.cliente_nome }}</h2>
+<p>{{ emprestimo.descricao or 'Empréstimo pessoal' }}</p>
+<div class="metrics three">
+<div>
+<span>Principal original</span>
+<strong>{{ emprestimo.valor_original_centavos|money }}</strong>
+</div>
+<div>
+<span>Principal em aberto</span>
+<strong>{{ emprestimo.saldo_atual_centavos|money }}</strong>
+</div>
+<div>
+<span>Juros mensais atuais</span>
+<strong>{{ juros_atual_centavos|money }}</strong>
+</div>
+</div>
+<p>Situação: <span class="badge">{{ emprestimo.status }}</span> · Taxa mensal: {{ emprestimo.taxa_juros_mensal|percent_br }}</p>{% if emprestimo.saldo_atual_centavos>0 %}<div class="actions">{% for op,label in [('juros','Receber juros'),('abatimento','Abater principal'),('quitacao','Quitar contrato')] %}<a class="button" href="{{ url_for('emprestimos_'+op,emprestimo_id=emprestimo.id) }}">{{ label }}</a>{% endfor %}</div>{% endif %}</section>
+<section class="panel">
+<h2>Histórico financeiro</h2>{{ table(movimentacoes,[('data_movimento','Data'),('tipo','Movimento'),('competencia','Competência'),('valor_centavos','Valor'),('saldo_depois_centavos','Principal após movimento')],'movimentacoes_editar','movimentacao_id') }}</section>{% endblock %}

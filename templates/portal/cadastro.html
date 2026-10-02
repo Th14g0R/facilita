@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Solicite seu acesso{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Solicite seu acesso</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel auth-panel">
+<p class="muted">Consulte seus contratos e acompanhe seus pagamentos.</p>
+<form method="post">{{ csrf() }}{{ field('cpf','CPF',request.form.get('cpf',''),required=true) }}{{ field('telefone','Telefone',request.form.get('telefone','')) }}{{ field('email','E-mail',request.form.get('email',''),type='email',required=true) }}{{ field('senha','Senha (mínimo 10 caracteres)',type='password',required=true) }}{{ field('confirmar_senha','Confirme a senha',type='password',required=true) }}<button class="button primary">Solicitar acesso</button>
+</form>
+<p>
+<a href="{{ url_for('portal.login') }}">Já tenho acesso</a>
+</p>
+</section>{% endblock %}

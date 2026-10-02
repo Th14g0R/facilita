@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Movimentações{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Movimentações</h1>
+</div>
+<div class="actions">
+</div>
+</header>
+<section class="panel">
+<form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}{{ field("data_inicio","De",request.args.get("data_inicio",""),type="date") }}{{ field("data_fim","Até",request.args.get("data_fim",""),type="date") }}<label class="field">
+<span>Movimento</span>
+<select name="tipo">{% for value,label in [('todos','Todos'),('juros','Juros'),('abatimento','Abatimento'),('quitacao','Quitação'),('emprestimo','Empréstimo')] %}<option value="{{ value }}" {% if tipo==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+</label>
+<button class="button">Filtrar</button>
+<a href="{{ request.path }}">Limpar</a>
+</form>{{ table(movimentacoes,[('data_movimento', 'Data'), ('cliente_nome', 'Cliente'), ('emprestimo_id', 'Contrato'), ('tipo', 'Tipo'), ('valor_centavos', 'Valor')],'movimentacoes_editar','movimentacao_id') }}</section>{% endblock %}

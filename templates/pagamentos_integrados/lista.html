@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Recebimentos{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Recebimentos</h1>
+</div>
+<div class="actions">
+<a class="button primary" href="{{ url_for('pagamentos_integrados_novo') }}">Registrar pagamento</a>
+</div>
+</header>
+<section class="panel">
+<form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}{{ field("mes","Mês",request.args.get("mes",""),type="month") }}<button class="button">Filtrar</button>
+<a href="{{ request.path }}">Limpar</a>
+</form>{{ table(pagamentos,[('id', 'Pagamento'), ('cliente_nome', 'Cliente'), ('data_pagamento', 'Data'), ('valor_total_centavos', 'Total recebido')],'pagamentos_integrados_detalhe','pagamento_id') }}</section>{% endblock %}

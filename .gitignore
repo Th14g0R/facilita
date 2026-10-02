@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+.venv-local/
+data/local-test/
+venv/
+
+# Ambiente / segredos
+.env
+.env.*
+!.env.example
+data/.secret_key
+*.secret_key
+
+# Banco e arquivos SQLite
+data/emprestimos.db
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Comprovantes privados enviados pelos clientes
+data/comprovantes/
+
+# Runtime Windows
+logs/
+service/
+backups/
+*.log
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Mantém somente o diretório de dados versionável quando criado
+!data/.gitkeep
+
+# Saídas de build e dados privados em qualquer subdiretório
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+data/*
+!data/.gitkeep
