@@ -52,6 +52,20 @@ class PostgresCursorWrapper:
         # Remove COLLATE NOCASE em PostgreSQL para evitar dependencia de collation
         if "COLLATE NOCASE" in converted_sql.upper():
             converted_sql = re.sub(r"\s+COLLATE\s+NOCASE", "", converted_sql, flags=re.IGNORECASE)
+        # Converte strftime('%d', ...) e strftime('%Y-%m', ...) para SUBSTRING no PostgreSQL
+        if "strftime(" in converted_sql.lower():
+            converted_sql = re.sub(
+                r"strftime\s*\(\s*'%d'\s*,\s*([^)]+)\)",
+                r"SUBSTR(\1, 9, 2)",
+                converted_sql,
+                flags=re.IGNORECASE,
+            )
+            converted_sql = re.sub(
+                r"strftime\s*\(\s*'%Y-%m'\s*,\s*([^)]+)\)",
+                r"SUBSTR(\1, 1, 7)",
+                converted_sql,
+                flags=re.IGNORECASE,
+            )
         is_limites = "LIMITES_PUBLICOS" in upper
         should_return_id = is_insert and not has_returning and not is_limites
         if should_return_id:
@@ -132,6 +146,22 @@ def migrate_postgres(conn: PostgresConnection) -> None:
             cur.execute("ALTER TABLE clientes_acessos ADD COLUMN IF NOT EXISTS usuario TEXT;")
             try:
                 cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_acessos_usuario ON clientes_acessos(usuario);")
+            except Exception:
+                pass
+            try:
+                cur.execute("""
+                    CREATE OR REPLACE FUNCTION strftime(format text, val text) RETURNS text AS $$
+                    BEGIN
+                        IF format = '%d' THEN
+                            RETURN SUBSTRING(val FROM 9 FOR 2);
+                        ELSIF format = '%Y-%m' THEN
+                            RETURN SUBSTRING(val FROM 1 FOR 7);
+                        ELSE
+                            RETURN val;
+                        END IF;
+                    END;
+                    $$ LANGUAGE plpgsql IMMUTABLE;
+                """)
             except Exception:
                 pass
         conn._conn.set_isolation_level(old_level)

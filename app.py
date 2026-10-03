@@ -134,6 +134,25 @@ def create_app() -> Flask:
     register_context_processors(app)
     register_template_filters(app)
 
+    @app.errorhandler(500)
+    @app.errorhandler(Exception)
+    def handle_unhandled_error(e):
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException) and e.code != 500:
+            return e
+        import traceback
+        tb = traceback.format_exc()
+        app.logger.error("Erro interno no servidor:\n%s", tb)
+        return (
+            "<div style='font-family:system-ui,-apple-system,sans-serif; padding:2rem; max-width:860px; margin:2rem auto; border:1px solid #fca5a5; border-radius:8px; background:#fef2f2;'>"
+            "<h2 style='color:#b91c1c; margin-top:0;'>Erro interno ao carregar a página</h2>"
+            "<p style='color:#7f1d1d;'>O servidor encontrou um problema ao processar esta requisição. Detalhes técnicos:</p>"
+            f"<pre style='background:#ffffff; padding:1rem; border-radius:6px; border:1px solid #fecaca; color:#991b1b; overflow:auto; font-size:13px; white-space:pre-wrap;'>{tb}\nExcecao: {e}</pre>"
+            "<p><a href='/dashboard' style='color:#2563eb;'>← Voltar para o início</a></p>"
+            "</div>",
+            500,
+        )
+
     register_routes(app)
 
     from portal import register_portal
@@ -284,6 +303,16 @@ def register_template_filters(app: Flask) -> None:
     app.add_template_filter(format_competencia_br, "competencia_br")
     app.add_template_filter(format_titulo_status, "titulo_status")
     app.add_template_filter(format_tipo_label, "tipo_label")
+
+    def _acesso_status(val: str | None) -> str:
+        return {
+            "PENDENTE": "Pendente",
+            "ATIVO": "Ativo",
+            "REJEITADO": "Rejeitado",
+            "BLOQUEADO": "Inativo",
+        }.get(str(val or "").upper(), val or "-")
+
+    app.add_template_filter(_acesso_status, "acesso_status")
 
 
 def get_csrf_token() -> str:
@@ -1952,7 +1981,7 @@ def register_routes(app: Flask) -> None:
         cartoes = db.execute(
             """
             SELECT cc.id, cc.descricao, cc.ativo,
-                   COALESCE(cc.dia_vencimento, CAST(strftime('%d', MIN(pc.vencimento)) AS INTEGER)) AS dia_vencimento,
+                   COALESCE(cc.dia_vencimento, CAST(SUBSTR(MIN(pc.vencimento), 9, 2) AS INTEGER)) AS dia_vencimento,
                    COALESCE(SUM(pc.valor_centavos), 0) AS total_emprestado_centavos,
                    COUNT(pc.id) AS parcelas_totais,
                    COALESCE(SUM(CASE WHEN pc.status = 'PAGO' THEN 1 ELSE 0 END), 0) AS parcelas_pagas,

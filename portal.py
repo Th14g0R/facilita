@@ -254,7 +254,7 @@ def card_summaries(client_id):
     db=get_db(); refresh_overdue_card_installments(db)
     return db.execute("""
         SELECT cc.id,cc.descricao,cc.ativo,
-               COALESCE(cc.dia_vencimento, CAST(strftime('%d', MIN(pc.vencimento)) AS INTEGER)) dia_vencimento,
+               COALESCE(cc.dia_vencimento, CAST(SUBSTR(MIN(pc.vencimento), 9, 2) AS INTEGER)) dia_vencimento,
                COALESCE(SUM(pc.valor_centavos),0) total_emprestado_centavos,
                COUNT(pc.id) parcelas_totais,
                COALESCE(SUM(CASE WHEN pc.status='PAGO' THEN 1 ELSE 0 END),0) parcelas_pagas,
