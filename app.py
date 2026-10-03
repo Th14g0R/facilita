@@ -133,6 +133,13 @@ def create_app() -> Flask:
     register_hooks(app)
     register_context_processors(app)
     register_template_filters(app)
+
+    @app.errorhandler(500)
+    def handle_500_debug(e):
+        import traceback
+        tb = traceback.format_exc()
+        return f"<pre style='color:red; font-size:14px; white-space:pre-wrap;'>DIAGNOSTICO DE ERRO 500:\n\n{tb}\n\nExcecao: {e}</pre>", 500
+
     register_routes(app)
 
     from portal import register_portal
