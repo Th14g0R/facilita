@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}Empréstimos{% endblock %} · Empréstimos</title>
+<title>{% block title %}Facilita{% endblock %} · Facilita</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,10 +22,10 @@
 {% set portal_area = request.endpoint and request.endpoint.startswith('portal.') and not request.endpoint.startswith('portal.admin') and request.endpoint not in ['portal.edit_access'] %}
 {% if g.usuario or g.portal_access %}<aside class="sidebar">
 <a class="brand" href="{{ url_for('portal.dashboard' if portal_area else 'dashboard') }}">
-<span class="brand-icon">E</span> Empréstimos</a>
+<span class="brand-icon">F</span> Facilita</a>
 <p class="nav-label">{{ 'ÁREA DO CLIENTE' if portal_area else 'SEU NEGÓCIO' }}</p>
 <nav aria-label="Navegação principal">
-{% if portal_area %}{% set menu=[('portal.dashboard','Minha visão geral'),('portal.statement','Meu extrato'),('portal.proofs','Comprovantes')] %}{% else %}{% set menu=[('dashboard','Visão geral'),('clientes_lista','Clientes'),('emprestimos_lista','Empréstimos'),('titulos_receber_lista','A receber'),('pagamentos_integrados_lista','Recebimentos'),('cartoes_lista','Cartões'),('movimentacoes_lista','Movimentações'),('relatorio_cliente','Relatórios'),('contas_lista','Contas bancárias'),('portal.admin_proofs','Comprovantes'),('portal.admin_accesses','Acessos ao portal'),('auditoria_lista','Auditoria')] %}{% endif %}
+{% if portal_area %}{% set menu=[('portal.dashboard','Minha visão geral'),('portal.statement','Meu extrato'),('portal.proofs','Comprovantes')] %}{% else %}{% set menu=[('dashboard','Visão geral'),('clientes_lista','Clientes'),('emprestimos_lista','Operações'),('titulos_receber_lista','A receber'),('pagamentos_integrados_lista','Recebimentos'),('cartoes_lista','Cartões'),('movimentacoes_lista','Movimentações'),('relatorio_cliente','Relatórios'),('contas_lista','Contas bancárias'),('portal.admin_proofs','Comprovantes'),('portal.admin_accesses','Acessos ao portal'),('auditoria_lista','Auditoria')] %}{% endif %}
 {% for endpoint,label in menu %}<a href="{{ url_for(endpoint) }}" {% if request.endpoint==endpoint %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
 <div class="sidebar-footer">
 <span>{{ g.portal_access.cliente_nome if portal_area and g.portal_access else g.usuario.nome }}</span>
@@ -38,7 +38,7 @@
 <main id="conteudo" class="{{ 'workspace' if g.usuario or g.portal_access else 'public' }}">
 <div class="topbar">
 <div class="topbar-info">
-<span>{{ 'Portal do cliente' if portal_area else 'Gestão de empréstimos e cartões' }}</span>
+<span>{{ 'Portal do cliente' if portal_area else 'Gestão financeira e facilidades' }}</span>
 <span class="topbar-date">{{ hoje|date_br }}</span>
 </div>
 {% if g.usuario or g.portal_access %}
@@ -58,7 +58,7 @@
 {% endif %}
 </div>
 <div class="content">{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="alert {{ category }}" role="alert">{{ message }}</div>{% endfor %}{% endwith %}{% block content %}{% endblock %}</div>
-<footer class="version-footer">Empréstimo · v{{ app_version }}</footer>
+<footer class="version-footer">Facilita · v{{ app_version }}</footer>
 </main>
 </body>
 </html>

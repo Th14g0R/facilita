@@ -7,29 +7,29 @@
 <p class="muted">Acompanhe sua carteira e os próximos recebimentos.</p>
 </div>
 <div class="actions">
-<a class="button" href="{{ url_for('emprestimos_novo') }}">Novo empréstimo</a>
-<a class="button primary" href="{{ url_for('pagamentos_integrados_novo') }}">Registrar pagamento</a>
+<a class="button" href="{{ url_for('emprestimos_novo') }}">Nova operação</a>
+<a class="button primary" href="{{ url_for('pagamentos_integrados_novo') }}">Registrar recebimento</a>
 </div>
 </header>
 {% if painel.conflitos_historicos %}<div class="alert warning" role="alert">Há {{ painel.conflitos_historicos }} ocorrências históricas de juros duplicados ou saldos parciais para conferir. Os registros foram preservados. Novos recebimentos seguem a regra de juros integrais e únicos por competência.</div>{% endif %}
 <div class="metrics">
 <a class="metric featured" href="{{ url_for('emprestimos_lista',status='ativos') }}">
-<span>Principal em aberto</span>
+<span>Valores em aberto</span>
 <strong>{{ metrics.saldo_devedor_centavos|money }}</strong>
-<small>{{ metrics.emprestimos_ativos }} contratos ativos · sem juros e cartões</small>
+<small>{{ metrics.emprestimos_ativos }} operações ativas · sem cartões</small>
 </a>
 <a class="metric" href="{{ url_for('movimentacoes_lista',tipo='juros',data_inicio=mes_atual~'-01',data_fim=painel.inicio) }}">
-<span>Juros recebidos no mês</span>
+<span>Taxas recebidas no mês</span>
 <strong>{{ metrics.juros_mes_centavos|money }}</strong>
 <small>{{ mes_atual|competencia_br }} · por data de recebimento</small>
 </a>
 <a class="metric overdue" href="{{ url_for('titulos_receber_lista',status='vencido') }}">
-<span>Juros vencidos</span>
+<span>Taxas pendentes</span>
 <strong>{{ painel.vencido|money }}</strong>
 <small>{{ painel.titulos_vencidos }} títulos aguardando recebimento</small>
 </a>
 <a class="metric" href="{{ url_for('titulos_receber_lista',status='abertos',data_inicio=painel.inicio,data_fim=painel.fim) }}">
-<span>Juros a vencer em 7 dias</span>
+<span>Taxas a vencer em 7 dias</span>
 <strong>{{ painel.proximos|money }}</strong>
 <small>Inclui os vencimentos de hoje</small>
 </a>
@@ -43,7 +43,7 @@
 </div>{{ table(proximos_titulos,[('cliente_nome','Cliente'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')],'titulos_receber_detalhe','titulo_id',empty='Tudo em dia. Os próximos títulos aparecerão aqui.') }}</section>
 <section class="panel">
 <div class="panel-heading">
-<h2>Últimos recebimentos de empréstimos</h2>
+<h2>Últimos recebimentos de operações</h2>
 <a href="{{ url_for('movimentacoes_lista') }}">Ver histórico →</a>
 </div>{{ table(ultimas_movimentacoes,[('cliente_nome','Cliente'),('data_movimento','Data'),('tipo','Tipo'),('valor_centavos','Recebido')],'movimentacoes_editar','movimentacao_id',empty='Ainda não há recebimentos registrados.') }}</section>
 </div>

@@ -1,11 +1,11 @@
 {% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}Empréstimos{% endblock %}{% block content %}<header class="page-heading">
+{% block title %}Operações{% endblock %}{% block content %}<header class="page-heading">
 <div>
 <p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>Empréstimos</h1>
+<h1>Operações</h1>
 </div>
 <div class="actions">
-<a class="button primary" href="{{ url_for('emprestimos_novo') }}">Novo empréstimo</a>
+<a class="button primary" href="{{ url_for('emprestimos_novo') }}">Nova operação</a>
 </div>
 </header>
 <section class="panel">
@@ -19,4 +19,4 @@
 </label>
 <button class="button">Filtrar</button>
 <a href="{{ request.path }}">Limpar</a>
-</form>{{ table(emprestimos,[('id', 'Contrato'), ('cliente_nome', 'Cliente'), ('data_emprestimo', 'Data'), ('valor_original_centavos', 'Valor original'), ('saldo_atual_centavos', 'Principal em aberto'), ('status', 'Situação')],'emprestimos_detalhe','emprestimo_id') }}</section>{% endblock %}
+</form>{{ table(emprestimos,[('id', 'Contrato'), ('cliente_nome', 'Cliente'), ('data_emprestimo', 'Data'), ('valor_original_centavos', 'Valor acordado'), ('saldo_atual_centavos', 'Saldo em aberto'), ('status', 'Situação')],'emprestimos_detalhe','emprestimo_id') }}</section>{% endblock %}

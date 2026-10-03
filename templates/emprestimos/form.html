@@ -1,13 +1,13 @@
 {% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}Novo empréstimo{% endblock %}{% block content %}<header class="page-heading">
+{% block title %}Nova operação{% endblock %}{% block content %}<header class="page-heading">
 <div>
 <p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>Novo empréstimo</h1>
+<h1>Nova operação</h1>
 </div>
 <div class="actions">
 </div>
 </header>
 <section class="panel">
-<form method="post" data-confirm="Confirme o cliente, o valor e as contas do desembolso.">{{ csrf() }}<div class="form-grid">{{ select('cliente_id','Cliente',clientes,emprestimo.cliente_id) }}{{ field('descricao','Descrição',emprestimo.descricao) }}{{ field('valor_original','Principal (R$)',emprestimo.valor_original,required=true) }}{{ field('taxa_juros_mensal','Taxa mensal (%)',emprestimo.taxa_juros_mensal_input|default(emprestimo.taxa_juros_mensal),required=true) }}{{ field('data_emprestimo','Data do empréstimo',emprestimo.data_emprestimo,type='date',required=true) }}{{ field('data_primeiro_vencimento','Primeiro vencimento',emprestimo.data_primeiro_vencimento,type='date',required=true) }}</div>{{ banks(emprestimo,contas_proprias,contas_clientes) }}<button class="button primary">Registrar empréstimo</button>
+<form method="post" data-confirm="Confirme o cliente, o valor e as contas da operação.">{{ csrf() }}<div class="form-grid">{{ select('cliente_id','Cliente',clientes,emprestimo.cliente_id) }}{{ field('descricao','Descrição',emprestimo.descricao) }}{{ field('valor_original','Valor acordado (R$)',emprestimo.valor_original,required=true) }}{{ field('taxa_juros_mensal','Taxa de serviço (%)',emprestimo.taxa_juros_mensal_input|default(emprestimo.taxa_juros_mensal),required=true) }}{{ field('data_emprestimo','Data de início',emprestimo.data_emprestimo,type='date',required=true) }}{{ field('data_primeiro_vencimento','Primeiro vencimento',emprestimo.data_primeiro_vencimento,type='date',required=true) }}</div>{{ banks(emprestimo,contas_proprias,contas_clientes) }}<button class="button primary">Registrar operação</button>
 </form>
 </section>{% endblock %}

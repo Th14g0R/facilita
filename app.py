@@ -274,6 +274,7 @@ def register_template_filters(app: Flask) -> None:
     app.add_template_filter(format_percent_br, "percent_br")
     app.add_template_filter(format_competencia_br, "competencia_br")
     app.add_template_filter(format_titulo_status, "titulo_status")
+    app.add_template_filter(format_tipo_label, "tipo_label")
 
 
 def get_csrf_token() -> str:
@@ -382,6 +383,19 @@ def format_titulo_status(value: Any) -> str:
     if text == "PREVISTO":
         return "PENDENTE"
     return text or "-"
+
+
+
+def format_tipo_label(value: Any) -> str:
+    """Mapeia identificadores de movimentação/natureza para termos discretos e profissionais."""
+    text = str(value or "").strip().upper()
+    mapping = {
+        "JUROS": "Taxa de Serviço",
+        "EMPRESTIMO": "Aporte",
+        "ABATIMENTO": "Amortização",
+        "QUITACAO": "Liquidação",
+    }
+    return mapping.get(text, text or "-")
 
 
 def format_percent_br(value: Any) -> str:
@@ -2305,7 +2319,7 @@ def register_routes(app: Flask) -> None:
                     clientes=clientes,
                     contas_proprias=contas_proprias,
                     contas_clientes=contas_clientes,
-                    titulo="Novo empréstimo",
+                    titulo="Nova operação",
                 )
 
             cliente = db.execute(
@@ -2321,7 +2335,7 @@ def register_routes(app: Flask) -> None:
                     clientes=clientes,
                     contas_proprias=contas_proprias,
                     contas_clientes=contas_clientes,
-                    titulo="Novo empréstimo",
+                    titulo="Nova operação",
                 )
 
             flow_errors = validate_money_flow_accounts(
@@ -2339,7 +2353,7 @@ def register_routes(app: Flask) -> None:
                     clientes=clientes,
                     contas_proprias=contas_proprias,
                     contas_clientes=contas_clientes,
-                    titulo="Novo empréstimo",
+                    titulo="Nova operação",
                 )
 
             valor_centavos = int(form["valor_original_centavos"])
@@ -2428,7 +2442,7 @@ def register_routes(app: Flask) -> None:
                     clientes=clientes,
                     contas_proprias=contas_proprias,
                     contas_clientes=contas_clientes,
-                    titulo="Novo empréstimo",
+                    titulo="Nova operação",
                 ), 500
 
             flash("Empréstimo cadastrado com sucesso.", "success")
@@ -2451,7 +2465,7 @@ def register_routes(app: Flask) -> None:
             clientes=clientes,
             contas_proprias=contas_proprias,
             contas_clientes=contas_clientes,
-            titulo="Novo empréstimo",
+            titulo="Nova operação",
         )
 
     @app.get("/emprestimos/<int:emprestimo_id>")

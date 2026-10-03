@@ -16,7 +16,7 @@
 <thead>
 <tr>{% for key,label in columns %}<th scope="col" class="{{ 'money' if key.endswith('_centavos') else '' }}">{{ label }}</th>{% endfor %}{% if endpoint %}<th scope="col">Ação</th>{% endif %}</tr>
 </thead>
-<tbody>{% for row in rows %}<tr>{% for key,label in columns %}<td class="{{ 'money' if key.endswith('_centavos') else '' }}">{% if key.endswith('_centavos') %}{{ row[key]|money if row[key] is not none else '—' }}{% elif key in ['status','tipo','natureza'] %}<span class="badge {{ row[key]|lower }}">{{ row[key]|titulo_status if key=='status' else row[key] }}</span>{% elif key.startswith('data_') or key=='vencimento' %}{{ row[key]|date_br }}{% elif key=='competencia' %}{{ row[key]|competencia_br }}{% else %}{{ row[key] if row[key] is not none else '—' }}{% endif %}</td>{% endfor %}{% if endpoint %}<td>
+<tbody>{% for row in rows %}<tr>{% for key,label in columns %}<td class="{{ 'money' if key.endswith('_centavos') else '' }}">{% if key.endswith('_centavos') %}{{ row[key]|money if row[key] is not none else '—' }}{% elif key in ['status','tipo','natureza'] %}<span class="badge {{ row[key]|lower }}">{{ row[key]|titulo_status if key=='status' else (row[key]|tipo_label if key in ['tipo','natureza'] else row[key]) }}</span>{% elif key.startswith('data_') or key=='vencimento' %}{{ row[key]|date_br }}{% elif key=='competencia' %}{{ row[key]|competencia_br }}{% else %}{{ row[key] if row[key] is not none else '—' }}{% endif %}</td>{% endfor %}{% if endpoint %}<td>
 <a href="{{ url_for(endpoint,**{param:row[id_key]}) }}">Abrir <span class="sr-only">registro {{ row[id_key] }}</span>→</a>
 </td>{% endif %}</tr>{% else %}<tr>
 <td colspan="{{ columns|length + (1 if endpoint else 0) }}">

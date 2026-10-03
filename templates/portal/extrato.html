@@ -12,7 +12,7 @@
 <label class="field">
 <span>Contrato</span>
 <select name="contrato_id">
-<option value="">Todos os contratos</option>{% for c in contratos %}<option value="{{ c.id }}" {% if contrato_id==c.id %}selected{% endif %}>#{{ c.id }} · {{ c.descricao or 'Empréstimo' }}</option>{% endfor %}</select>
+<option value="">Todos os contratos</option>{% for c in contratos %}<option value="{{ c.id }}" {% if contrato_id==c.id %}selected{% endif %}>#{{ c.id }} · {{ c.descricao or 'Operação' }}</option>{% endfor %}</select>
 </label>
 <label class="field">
 <span>Período</span>
@@ -28,7 +28,7 @@
 </label>
 <label class="field">
 <span>Movimento</span>
-<select name="tipo_movimento">{% for value,label in [('TODOS','Todos'),('JUROS','Juros'),('ABATIMENTO','Abatimento'),('QUITACAO','Quitação'),('EMPRESTIMO','Empréstimo')] %}<option value="{{ value }}" {% if tipo_movimento==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+<select name="tipo_movimento">{% for value,label in [('TODOS','Todos'),('JUROS','Taxa de Serviço'),('ABATIMENTO','Amortização'),('QUITACAO','Liquidação'),('EMPRESTIMO','Aporte / Liberação')] %}<option value="{{ value }}" {% if tipo_movimento==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
 </label>{{ field('data_inicio','De',data_inicio,type='date') }}{{ field('data_fim','Até',data_fim,type='date') }}<button class="button">Filtrar</button>
 </form>
 <h2>Títulos</h2>{{ table(titulos,[('emprestimo_id','Contrato'),('competencia','Competência'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')]) }}<h2>Movimentações</h2>{{ table(movimentos,[('data_movimento','Data'),('emprestimo_id','Contrato'),('tipo','Tipo'),('valor_centavos','Valor')]) }}</section>{% endblock %}

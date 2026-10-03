@@ -10,7 +10,7 @@
 <section class="panel">
 <form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}{{ field("data_inicio","De",request.args.get("data_inicio",""),type="date") }}{{ field("data_fim","Até",request.args.get("data_fim",""),type="date") }}<label class="field">
 <span>Movimento</span>
-<select name="tipo">{% for value,label in [('todos','Todos'),('juros','Juros'),('abatimento','Abatimento'),('quitacao','Quitação'),('emprestimo','Empréstimo')] %}<option value="{{ value }}" {% if tipo==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+<select name="tipo">{% for value,label in [('todos','Todos'),('juros','Taxa de Serviço'),('abatimento','Amortização'),('quitacao','Liquidação'),('emprestimo','Aporte / Liberação')] %}<option value="{{ value }}" {% if tipo==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
 </label>
 <button class="button">Filtrar</button>
 <a href="{{ request.path }}">Limpar</a>

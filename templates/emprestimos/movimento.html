@@ -1,16 +1,16 @@
 {% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}{{ operacao|replace("QUITACAO","Quitação")|replace("ABATIMENTO","Abatimento")|replace("JUROS","Receber juros") }} · Contrato #{{ emprestimo.id }}{% endblock %}{% block content %}<header class="page-heading">
+{% block title %}{{ operacao|replace("QUITACAO","Liquidação")|replace("ABATIMENTO","Amortização")|replace("JUROS","Receber taxa") }} · Contrato #{{ emprestimo.id }}{% endblock %}{% block content %}<header class="page-heading">
 <div>
 <p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>{{ operacao|replace("QUITACAO","Quitação")|replace("ABATIMENTO","Abatimento")|replace("JUROS","Receber juros") }} · Contrato #{{ emprestimo.id }}</h1>
+<h1>{{ operacao|replace("QUITACAO","Liquidação")|replace("ABATIMENTO","Amortização")|replace("JUROS","Receber taxa") }} · Contrato #{{ emprestimo.id }}</h1>
 </div>
 <div class="actions">
 </div>
 </header>
 <section class="panel">
 <p>
-<strong>{{ emprestimo.cliente_nome }}</strong> · Principal atual: <strong>{{ emprestimo.saldo_atual_centavos|money }}</strong>
+<strong>{{ emprestimo.cliente_nome }}</strong> · Saldo em aberto: <strong>{{ emprestimo.saldo_atual_centavos|money }}</strong>
 </p>{% if valor_calculado_centavos is not none %}<p class="callout">Valor da operação: <strong>{{ valor_calculado_centavos|money }}</strong>
-</p>{% endif %}<form method="post" data-confirm="Deseja confirmar esta movimentação financeira?">{{ csrf() }}<div class="form-grid">{{ field('data_movimento','Data do recebimento',form.data_movimento,type='date',required=true) }}{% if operacao=='ABATIMENTO' %}{{ field('valor','Valor do abatimento (R$)',form.valor,required=true) }}{% elif operacao=='JUROS' %}{{ field('competencia','Competência',form.competencia,type='month',required=true) }}{% endif %}</div>{{ banks(form,contas_cliente,contas_proprias) }}{{ field('observacao','Observação',form.observacao,type='textarea') }}<button class="button primary">Confirmar recebimento</button>
+</p>{% endif %}<form method="post" data-confirm="Deseja confirmar esta movimentação financeira?">{{ csrf() }}<div class="form-grid">{{ field('data_movimento','Data do recebimento',form.data_movimento,type='date',required=true) }}{% if operacao=='ABATIMENTO' %}{{ field('valor','Valor da amortização (R$)',form.valor,required=true) }}{% elif operacao=='JUROS' %}{{ field('competencia','Competência',form.competencia,type='month',required=true) }}{% endif %}</div>{{ banks(form,contas_cliente,contas_proprias) }}{{ field('observacao','Observação',form.observacao,type='textarea') }}<button class="button primary">Confirmar recebimento</button>
 </form>
 </section>{% endblock %}
