@@ -1152,6 +1152,9 @@ def reject_proof(pid):
 
 
 def register_portal(app):
-    PROOFS_DIR.mkdir(parents=True,exist_ok=True)
+    try:
+        PROOFS_DIR.mkdir(parents=True,exist_ok=True)
+    except OSError:
+        pass
     with app.app_context(): init_schema()
     app.register_blueprint(bp)

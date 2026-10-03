@@ -42,8 +42,13 @@ BASE_DIR = Path(__file__).resolve().parent
 # Em Windows/local, o padrão continua sendo <projeto>/data.
 # Em hospedagens com volume persistente, EMPRESTIMO_DATA_DIR permite apontar
 # banco e chave para o diretório persistente fornecido pelo provedor.
+if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    default_data_dir = "/tmp/facilita_data"
+else:
+    default_data_dir = str(BASE_DIR / "data")
+
 DATA_DIR = Path(
-    os.environ.get("EMPRESTIMO_DATA_DIR", str(BASE_DIR / "data"))
+    os.environ.get("EMPRESTIMO_DATA_DIR", default_data_dir)
 ).expanduser().resolve()
 
 DATABASE_PATH = Path(
@@ -86,7 +91,10 @@ def env_list(name: str) -> list[str]:
 def create_app() -> Flask:
     app = Flask(__name__)
 
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
 
     app.config.update(
         DATABASE=str(DATABASE_PATH),

@@ -49,6 +49,9 @@ class PostgresCursorWrapper:
         has_returning = "RETURNING" in upper
 
         converted_sql = sql.replace("?", "%s")
+        # Remove COLLATE NOCASE em PostgreSQL para evitar dependencia de collation
+        if "COLLATE NOCASE" in converted_sql.upper():
+            converted_sql = re.sub(r"\s+COLLATE\s+NOCASE", "", converted_sql, flags=re.IGNORECASE)
         if is_insert and not has_returning:
             converted_sql = converted_sql.rstrip(" ;") + " RETURNING id;"
 
