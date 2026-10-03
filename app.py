@@ -1990,7 +1990,7 @@ def register_routes(app: Flask) -> None:
               LEFT JOIN lancamentos_cartao lc ON lc.cartao_credito_id = cc.id
               LEFT JOIN parcelas_cartao pc ON pc.lancamento_cartao_id = lc.id
              WHERE cc.cliente_id = ?
-             GROUP BY cc.id
+             GROUP BY cc.id, cc.descricao, cc.ativo, cc.dia_vencimento
              ORDER BY cc.ativo DESC, cc.id DESC
             """,
             (cliente_id,),
@@ -2911,7 +2911,7 @@ def register_routes(app: Flask) -> None:
             params.extend([like, like, like])
 
         sql += """
-            GROUP BY p.id
+            GROUP BY p.id, p.data_pagamento, p.valor_total_centavos, p.observacao, p.created_at, c.id, c.nome, u.nome
             ORDER BY p.data_pagamento DESC, p.id DESC
             LIMIT 500
         """
@@ -4367,7 +4367,7 @@ def register_routes(app: Flask) -> None:
             like = f"%{termo}%"
             sql += " AND (c.nome LIKE ? COLLATE NOCASE OR cc.descricao LIKE ? COLLATE NOCASE)"
             params.extend([like, like])
-        sql += " GROUP BY cc.id, c.id ORDER BY cc.ativo DESC, c.nome COLLATE NOCASE, cc.id DESC"
+        sql += " GROUP BY cc.id, cc.descricao, cc.ativo, cc.created_at, c.id, c.nome ORDER BY cc.ativo DESC, c.nome COLLATE NOCASE, cc.id DESC"
         cartoes = db.execute(sql, params).fetchall()
         return render_template("cartoes/lista.html", cartoes=cartoes, termo=termo, status=status)
 

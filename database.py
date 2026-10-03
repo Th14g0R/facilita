@@ -66,6 +66,14 @@ class PostgresCursorWrapper:
                 converted_sql,
                 flags=re.IGNORECASE,
             )
+        # Converte GROUP_CONCAT(...) para STRING_AGG(..., ',') no PostgreSQL
+        if "group_concat(" in converted_sql.lower():
+            converted_sql = re.sub(
+                r"group_concat\s*\(\s*(distinct\s+)?([^,)]+)\)",
+                lambda m: f"STRING_AGG({m.group(1) or ''}{m.group(2)}::text, ',')",
+                converted_sql,
+                flags=re.IGNORECASE,
+            )
         is_limites = "LIMITES_PUBLICOS" in upper
         should_return_id = is_insert and not has_returning and not is_limites
         if should_return_id:

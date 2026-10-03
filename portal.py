@@ -262,7 +262,7 @@ def card_summaries(client_id):
           FROM cartoes_credito cc
           LEFT JOIN lancamentos_cartao lc ON lc.cartao_credito_id=cc.id
           LEFT JOIN parcelas_cartao pc ON pc.lancamento_cartao_id=lc.id
-         WHERE cc.cliente_id=? GROUP BY cc.id ORDER BY cc.ativo DESC,cc.id DESC
+         WHERE cc.cliente_id=? GROUP BY cc.id, cc.descricao, cc.ativo, cc.dia_vencimento ORDER BY cc.ativo DESC,cc.id DESC
     """,(client_id,)).fetchall()
 
 
