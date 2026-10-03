@@ -3591,6 +3591,7 @@ def register_routes(app: Flask) -> None:
         mensagem_cobranca = ""
         whatsapp_url = ""
         telegram_url = ""
+        link_comprovante = ""
         resumo = {
             "quantidade": 0,
             "valor_total_centavos": 0,
@@ -3758,10 +3759,18 @@ def register_routes(app: Flask) -> None:
             }
 
             if cobraveis_selecionados:
+                scheme = "https" if (request.is_secure or request.headers.get("X-Forwarded-Proto") == "https") else request.scheme
+                base_url = f"{scheme}://{request.host}"
+                query_parts = [f"titulo_id={item['id']}" for item in cobraveis_selecionados]
+                link_comprovante = f"{base_url}/portal/comprovantes/novo"
+                if query_parts:
+                    link_comprovante += f"?{'&'.join(query_parts)}"
+
                 mensagem_cobranca = build_receivables_collection_message(
                     cliente["nome"],
                     cobraveis_selecionados,
                     pix_key or None,
+                    link_portal=link_comprovante,
                 )
 
                 telefone = normalize_whatsapp_number_br(
@@ -3782,6 +3791,8 @@ def register_routes(app: Flask) -> None:
                     )
 
                 telegram_url = f"https://t.me/share/url?text={encoded_message}"
+            else:
+                link_comprovante = ""
 
         return render_template(
             "receber/relatorio_cliente.html",
@@ -3802,6 +3813,7 @@ def register_routes(app: Flask) -> None:
             mensagem_cobranca=mensagem_cobranca,
             whatsapp_url=whatsapp_url,
             telegram_url=telegram_url,
+            link_comprovante=link_comprovante,
         )
 
 
@@ -5968,6 +5980,7 @@ def build_receivables_collection_message(
     cliente_nome: str,
     titulos: list[dict[str, Any]],
     pix_key: str | None = None,
+    link_portal: str | None = None,
 ) -> str:
     """
     Gera mensagem objetiva e não intrusiva para cobrança.
@@ -6015,6 +6028,15 @@ def build_receivables_collection_message(
             [
                 "",
                 f"PIX para pagamento: {pix_key}",
+            ]
+        )
+
+    if link_portal:
+        lines.extend(
+            [
+                "",
+                "Para conferir e enviar o comprovante de pagamento, acesse:",
+                link_portal,
             ]
         )
 

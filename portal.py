@@ -127,7 +127,8 @@ def portal_required(view):
     def wrapped(*args, **kwargs):
         if getattr(g, 'portal_access', None) is None:
             flash('Faça login para acessar sua área.', 'warning')
-            return redirect(url_for('portal.login'))
+            next_url = request.full_path if request.query_string else request.path
+            return redirect(url_for('portal.login', next=next_url))
         return view(*args, **kwargs)
     return wrapped
 
@@ -529,6 +530,9 @@ def login():
             (row['id'],),
         )
         db.commit()
+        next_page = request.args.get('next') or request.form.get('next')
+        if next_page and next_page.startswith('/') and not next_page.startswith('//'):
+            return redirect(next_page)
         return redirect(url_for('portal.dashboard'))
     return render_template('portal/login.html', login=login_val, email=login_val)
 

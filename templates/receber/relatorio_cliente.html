@@ -140,8 +140,20 @@
   </div>
 
   <div class="panel" style="margin-top:16px; background:var(--surface);">
+    <div style="background:var(--surface-raised); border:1px solid var(--line); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div style="flex:1; min-width:240px;">
+        <span style="font-size:12px; color:var(--muted); display:block; margin-bottom:2px;">Link direto para o cliente anexar comprovante:</span>
+        <a id="link_portal_preview" href="{{ link_comprovante }}" target="_blank" rel="noopener" style="font-size:13px; font-weight:600; color:var(--brand); word-break:break-all;">
+          {{ link_comprovante }}
+        </a>
+      </div>
+      <button type="button" id="btn_copiar_link" class="button" style="padding:6px 12px; font-size:12px; min-height:auto;">
+        Copiar apenas link
+      </button>
+    </div>
+
     <h3 style="margin-top:0; margin-bottom:8px;">Mensagem de cobrança formatada</h3>
-    <textarea id="texto_cobranca" rows="9" readonly style="width:100%; box-sizing:border-box; font-family:monospace; font-size:13px; line-height:1.5; padding:12px; border-radius:var(--radius-sm); border:1px solid var(--line-strong); background:var(--surface-raised); color:var(--ink); resize:vertical;">{{ mensagem_cobranca }}</textarea>
+    <textarea id="texto_cobranca" rows="12" readonly style="width:100%; box-sizing:border-box; font-family:monospace; font-size:13px; line-height:1.5; padding:12px; border-radius:var(--radius-sm); border:1px solid var(--line-strong); background:var(--surface-raised); color:var(--ink); resize:vertical;">{{ mensagem_cobranca }}</textarea>
 
     <div class="actions" style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
       {% if whatsapp_url %}
@@ -202,6 +214,19 @@
     if (elContador) elContador.innerHTML = `<strong>${count}</strong> título(s) selecionado(s)`;
     if (elTotal) elTotal.textContent = formatMoney(totalCents);
 
+    // Constrói link direto do portal
+    let linkPortal = window.location.origin + "/portal/comprovantes/novo";
+    if (checks.length > 0) {
+      const q = checks.map(el => "titulo_id=" + encodeURIComponent(el.value)).join("&");
+      linkPortal += "?" + q;
+    }
+
+    const elLinkPreview = document.getElementById("link_portal_preview");
+    if (elLinkPreview) {
+      elLinkPreview.href = linkPortal;
+      elLinkPreview.textContent = linkPortal;
+    }
+
     // Constrói texto da mensagem
     let lines = [];
     if (count > 0) {
@@ -221,8 +246,13 @@
       lines.push(`Total a receber: ${formatMoney(totalCents)}.`);
       if (pixKey) {
         lines.push("");
-        lines.push(`Chave PIX para pagamento: ${pixKey}`);
+        lines.push(`PIX para pagamento: ${pixKey}`);
       }
+      lines.push("");
+      lines.push("Para conferir e enviar o comprovante de pagamento, acesse:");
+      lines.push(linkPortal);
+      lines.push("");
+      lines.push("Caso algum item já tenha sido pago, por favor desconsidere este aviso e me informe para conferência.");
     } else {
       lines.push("Nenhum título selecionado para cobrança.");
     }
@@ -320,6 +350,22 @@
           feedback.style.display = "inline";
           setTimeout(function() { feedback.style.display = "none"; }, 3000);
         }
+      });
+    });
+  }
+
+  // Copiar apenas o link do portal
+  const btnCopiarLink = document.getElementById("btn_copiar_link");
+  if (btnCopiarLink) {
+    btnCopiarLink.addEventListener("click", function() {
+      const elLink = document.getElementById("link_portal_preview");
+      if (!elLink || !elLink.href) return;
+      navigator.clipboard.writeText(elLink.href).then(function() {
+        const originalText = btnCopiarLink.textContent;
+        btnCopiarLink.textContent = "✓ Link copiado!";
+        setTimeout(function() { btnCopiarLink.textContent = originalText; }, 2500);
+      }).catch(function() {
+        prompt("Copie o link abaixo:", elLink.href);
       });
     });
   }

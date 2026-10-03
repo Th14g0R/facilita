@@ -3,7 +3,8 @@
 <header class="page-heading"><div><p class="eyebrow">MEUS PAGAMENTOS</p><h1>Enviar comprovante</h1></div></header>
 <section class="panel"><p class="muted">Informe a data em que pagou e confira os títulos. A baixa depende da análise do responsável.</p>
 <form method="post" enctype="multipart/form-data">{{ csrf() }}{{ field('data_pagamento','Data efetiva do pagamento',form.data_pagamento,type='date',required=true) }}
-{% for t in titulos %}<label class="check"><input type="checkbox" name="titulo_id" value="{{ t.id }}" {% if t.id|string in request.form.getlist('titulo_id') %}checked{% endif %}>Título #{{ t.id }} · Contrato #{{ t.emprestimo_id }} · {{ t.competencia|competencia_br }} · Vencimento {{ t.data_vencimento|date_br }}</label>{% else %}<p class="empty">Não há títulos disponíveis em aberto.</p>{% endfor %}
+{% set sel_ids = request.form.getlist('titulo_id') or request.args.getlist('titulo_id') %}
+{% for t in titulos %}<label class="check"><input type="checkbox" name="titulo_id" value="{{ t.id }}" {% if t.id|string in sel_ids %}checked{% endif %}>Título #{{ t.id }} · Contrato #{{ t.emprestimo_id }} · {{ t.competencia|competencia_br }} · Vencimento {{ t.data_vencimento|date_br }}</label>{% else %}<p class="empty">Não há títulos disponíveis em aberto.</p>{% endfor %}
 <button class="button" name="acao" value="prever" formnovalidate>Calcular e conferir valores</button>
 {% if planos %}{% include 'receber/_atraso.html' %}<input type="hidden" name="assinatura" value="{{ assinatura }}">
 <label class="field"><span>Comprovante (PDF, JPG ou PNG, até 6 MB)</span><input type="file" name="comprovante" accept="application/pdf,image/jpeg,image/png" required></label>

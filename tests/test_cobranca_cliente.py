@@ -33,6 +33,15 @@ class CobrancaClienteTest(fixture.ApplicationTests):
         self.assertIn("Copiar mensagem", html)
         self.assertIn("check_todos", html)
         self.assertIn("btn_marcar_todos", html)
+        self.assertIn("/portal/comprovantes/novo", html)
+
+    def test_link_portal_redireciona_com_next_para_login(self):
+        """Verifica se o acesso não autenticado a /portal/comprovantes/novo redireciona com next."""
+        client_anon = self.app.test_client()
+        resp = client_anon.get("/portal/comprovantes/novo?titulo_id=1")
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/portal/login", resp.headers["Location"])
+        self.assertIn("next=", resp.headers["Location"])
 
 
 if __name__ == "__main__":
