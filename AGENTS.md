@@ -1,90 +1,44 @@
-# AGENTS.md — Contexto obrigatório para IAs
+# AGENTS.md — Contexto obrigatório para IAs (Facilita)
 
 ## Objetivo
 
-Este repositório implementa um sistema web de controle de empréstimos pessoais e cartão de crédito. A prioridade do projeto é **simplicidade operacional**, integridade financeira e rastreabilidade.
+Este repositório implementa o **Facilita**, um sistema web discreto e seguro de controle financeiro, acordos, operações e cartões de crédito. A prioridade do projeto é **simplicidade operacional**, **integridade financeira centavo por centavo**, **discrição perante terceiros** e **alta disponibilidade na nuvem**.
 
-## Stack obrigatória
+## Stack e Arquitetura
 
-- Python
-- Flask
-- SQLite
-- Jinja2 / HTML / CSS
-- Waitress no Windows para produção
+- **Backend**: Python 3.12+ / Flask / WSGI
+- **Frontend**: Jinja2 / HTML5 / CSS Moderno (Vanilla CSS com Design Tokens e Modo Privacidade)
+- **Nuvem (Produção 24/7)**: Vercel Serverless (`api/index.py`, `vercel.json` com rewrites)
+- **Banco de Dados Produção**: Supabase PostgreSQL 17 (Datacenter São Paulo - `sa-east-1`)
+- **Banco de Dados Desenvolvimento/Testes**: Suporte híbrido transparente para SQLite (`data/emprestimos.db`) e PostgreSQL via `DATABASE_URL`
 
-Não introduzir Node.js, npm, Docker, PostgreSQL, Next.js, NestJS, Prisma ou uma arquitetura frontend/backend separada sem solicitação explícita.
+Não introduzir Node.js, npm, Docker, Next.js, Prisma ou frontend SPA separado sem solicitação explícita.
 
-## Inicialização
+## Regras Financeiras Obrigatórias
 
-Desenvolvimento:
+1. **Valores Monetários**: Sempre armazenados em **centavos inteiros** (`INTEGER` / `BIGINT`). Nunca usar `float` para valores financeiros.
+2. Cada operação pertence a um cliente e é independente das demais operações do mesmo cliente.
+3. Todo movimento financeiro pertence obrigatoriamente a um `emprestimo_id`.
+4. `EMPRESTIMO` (Aporte) cria o valor original e o saldo inicial da operação.
+5. `JUROS` (Taxa de Serviço) é integral por competência mensal e não reduz nem aumenta o saldo principal.
+6. Não pode existir mais de um lançamento `JUROS` para a mesma competência e operação.
+7. `ABATIMENTO` (Amortização) pode ocorrer várias vezes no mesmo mês e reduz apenas o saldo principal da operação selecionada.
+8. `QUITACAO` (Liquidação) deve corresponder ao saldo principal restante, zerar o saldo e marcar a operação como quitada.
+9. Uma operação permanece ativa enquanto possuir saldo principal maior que zero.
+10. Edição/correção de valor financeiro já lançado exige confirmação de senha do usuário logado e registro em auditoria.
 
-```text
-python app.py
-```
+## Vocabulário Discreto e Apresentação (Facilita)
 
-Produção Windows:
-
-```text
-Waitress -> Flask -> SQLite
-```
-
-O serviço Windows chama-se `Emprestimo`.
-
-## Banco
-
-Arquivo: `data/emprestimos.db`.
-
-- Usar `PRAGMA foreign_keys = ON` em toda conexão.
-- Preservar dados existentes em upgrades.
-- Migrações devem ser incrementais/compatíveis.
-- Valores monetários são armazenados em **centavos inteiros**.
-- Nunca usar `float` para valores monetários.
-- O banco e `data/.secret_key` não pertencem ao Git.
-
-## Regras financeiras obrigatórias
-
-1. Cada empréstimo pertence a um cliente e é independente dos demais empréstimos do mesmo cliente.
-2. Todo movimento financeiro de empréstimo pertence obrigatoriamente a um `emprestimo_id`.
-3. `EMPRESTIMO` cria o principal e o saldo inicial.
-4. `JUROS` é integral por competência mensal e não reduz nem aumenta o saldo principal.
-5. Não pode existir mais de um lançamento `JUROS` para a mesma competência e empréstimo.
-6. `ABATIMENTO` pode ocorrer várias vezes no mesmo mês e reduz apenas o saldo principal do empréstimo selecionado.
-7. `QUITACAO` deve corresponder ao saldo principal restante, zerar o saldo e marcar o empréstimo como `QUITADO`.
-8. Um empréstimo permanece ativo enquanto possuir saldo principal maior que zero.
-9. Origem/destino bancários precisam ser associados às movimentações e manter snapshot histórico do banco/PIX usados na operação.
-10. Edição/correção de valor financeiro já lançado é proibida por padrão. Se futuramente for implementada, deve exigir nova confirmação da senha do usuário atualmente logado e manter auditoria da alteração.
-
-## Fluxo bancário
-
-Empréstimo inicial:
-
-```text
-conta própria -> conta do cliente
-```
-
-Juros, abatimento e quitação:
-
-```text
-conta do cliente -> conta própria
-```
-
-## Segurança
-
-- Senhas armazenadas somente com hash Werkzeug.
-- Sessões protegidas pela `SECRET_KEY`.
-- Formulários POST usam CSRF.
-- Nunca colocar senha, token, banco de produção ou chave privada no repositório.
-- O repositório público não é backup adequado para dados financeiros.
-
-## Antes de alterar lógica financeira
-
-Leia `docs/BUSINESS_RULES.md` e confirme que a alteração mantém os invariantes descritos acima.
+Para preservar a privacidade do usuário em locais públicos e proteger os clientes no portal:
+- **Operações / Contratos**: substitui "Empréstimos"
+- **Taxa de Serviço / Compensação**: substitui "Juros"
+- **Aporte / Disponibilização**: substitui "Empréstimo inicial"
+- **Amortização**: substitui "Abatimento"
+- **Liquidação**: substitui "Quitação"
+- **Modo Privacidade**: oculta valores na tela mediante clique no botão de olho ou persistido em `localStorage`.
 
 ## Idioma e Comunicação
 
 - Responda e comunique-se sempre em **Português do Brasil (pt-BR)**.
 - Todos os comentários no código-fonte, docstrings e explicações técnicas devem ser escritos obrigatoriamente em **Português do Brasil (pt-BR)**.
-- Rastreamento de ações, metadados de ferramentas (`toolAction`, `toolSummary`, `Description`), solicitações de permissão e perguntas interativas devem ser apresentados exclusivamente em **Português do Brasil (pt-BR)**.
-- O acompanhamento passo a passo da evolução e depuração do código deve ser fornecido com total transparência em **Português do Brasil (pt-BR)**.
-
-
+- Metadados de ferramentas (`toolAction`, `toolSummary`, `Description`) devem ser redigidos exclusivamente em **Português do Brasil (pt-BR)**.
