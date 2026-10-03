@@ -9,7 +9,7 @@
 </header>
 <section class="panel auth-panel">
 <p class="muted">Consulte seus contratos e acompanhe seus pagamentos.</p>
-<form method="post">{{ csrf() }}{{ field('email','E-mail',request.form.get('email',''),type='email',required=true) }}{{ field('senha','Senha',type='password',required=true) }}<button class="button primary">Entrar</button>
+<form method="post">{{ csrf() }}{{ field('login','E-mail ou Usuário',request.form.get('login', request.form.get('email', '')),type='text',required=true) }}{{ field('senha','Senha',type='password',required=true) }}<button class="button primary">Entrar</button>
 </form>
 <p>
 <a href="{{ url_for('portal.register') }}">Solicitar acesso</a>

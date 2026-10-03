@@ -5,9 +5,10 @@
 <h1>Acessos ao portal</h1>
 </div>
 <div class="actions">
+<a class="button primary" href="{{ url_for('portal.new_access') }}">Criar credencial</a>
 </div>
 </header>
 <section class="panel">
 <form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}<button class="button">Filtrar</button>
 <a href="{{ request.path }}">Limpar</a>
-</form>{{ table(acessos,[('cliente_nome', 'Cliente'), ('email', 'E-mail'), ('status', 'Situação')],'portal.edit_access','aid') }}</section>{% endblock %}
+</form>{{ table(acessos,[('cliente_nome', 'Cliente'), ('usuario', 'Usuário'), ('email', 'E-mail'), ('status', 'Situação')],'portal.edit_access','aid') }}</section>{% endblock %}

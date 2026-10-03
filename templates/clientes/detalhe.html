@@ -17,6 +17,26 @@
 </div>
 </section>
 <section class="panel">
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
+<h2 style="margin:0;">Acesso ao Portal</h2>
+{% if acesso_portal %}
+<a class="button" href="{{ url_for('portal.edit_access', aid=acesso_portal.id) }}">Gerenciar acesso</a>
+{% else %}
+<a class="button primary" href="{{ url_for('portal.new_access', cliente_id=cliente.id) }}">Criar credencial de acesso</a>
+{% endif %}
+</div>
+{% if acesso_portal %}
+<p>
+<strong>Usuário:</strong> {{ acesso_portal.usuario or 'Não configurado' }} ·
+<strong>E-mail:</strong> {{ acesso_portal.email }} ·
+<strong>Situação:</strong> <span class="badge {{ acesso_portal.status|lower }}">{{ acesso_portal.status|acesso_status }}</span> ·
+<strong>Último login:</strong> {{ acesso_portal.ultimo_login_at or 'Nunca acessou' }}
+</p>
+{% else %}
+<p class="muted">Este cliente ainda não possui credencial para acessar a área do cliente.</p>
+{% endif %}
+</section>
+<section class="panel">
 <h2>Operações e Contratos</h2>{{ table(emprestimos,[('id','Contrato'),('valor_original_centavos','Valor acordado'),('saldo_atual_centavos','Saldo em aberto'),('status','Situação')],'emprestimos_detalhe','emprestimo_id') }}</section>
 <section class="panel">
 <h2>Contas bancárias</h2>{{ table(contas_bancarias,[('banco','Banco'),('chave_pix','PIX')],'contas_editar','conta_id') }}</section>

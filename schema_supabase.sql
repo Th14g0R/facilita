@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS clientes (
 CREATE TABLE IF NOT EXISTS clientes_acessos (
     id SERIAL PRIMARY KEY,
     cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    usuario TEXT UNIQUE,
     email TEXT NOT NULL UNIQUE,
     telefone_informado TEXT,
     senha_hash TEXT NOT NULL,

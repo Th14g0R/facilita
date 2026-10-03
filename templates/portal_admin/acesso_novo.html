@@ -1,0 +1,34 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Nova credencial de acesso{% endblock %}{% block content %}<header class="page-heading">
+<div>
+<p class="eyebrow">CONTROLE FINANCEIRO</p>
+<h1>Nova credencial de cliente</h1>
+</div>
+<div class="actions">
+<a class="button" href="{{ url_for('portal.admin_accesses') }}">Voltar para acessos</a>
+</div>
+</header>
+<section class="panel">
+<p class="muted">Defina as credenciais para o cliente acessar o portal de acompanhamento.</p>
+<form method="post">{{ csrf() }}
+{% if cliente_pre %}
+<input type="hidden" name="cliente_id" value="{{ cliente_pre.id }}">
+<p><strong>Cliente selecionado:</strong> {{ cliente_pre.nome }} (CPF: {{ cliente_pre.cpf or 'Não informado' }})</p>
+{% else %}
+{{ select('cliente_id','Selecione o cliente',clientes,form.cliente_id,text='nome') }}
+{% endif %}
+<div class="form-grid">
+{{ field('usuario','Nome de usuário (login)',form.usuario,required=true) }}
+{{ field('email','E-mail do cliente',form.email,type='email',required=true) }}
+{{ field('telefone','Telefone',form.telefone) }}
+{{ select('status','Situação inicial',[{'id':'ATIVO','nome':'Ativo (liberado imediatamente)'},{'id':'PENDENTE','nome':'Pendente de aprovação'},{'id':'BLOQUEADO','nome':'Inativo'}],form.status) }}
+</div>
+<div class="form-grid">
+{{ field('senha','Senha do cliente (mínimo 8 caracteres)',type='password',required=true) }}
+{{ field('confirmar_senha','Confirme a senha',type='password',required=true) }}
+</div>
+{{ field('observacao_admin','Observação interna',form.observacao_admin,type='textarea') }}
+{{ field('senha_confirmacao','Sua senha de administrador',type='password',required=true) }}
+<button class="button primary">Criar credencial de acesso</button>
+</form>
+</section>{% endblock %}

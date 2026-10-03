@@ -39,6 +39,7 @@ def init_schema() -> None:
     CREATE TABLE IF NOT EXISTS clientes_acessos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente_id INTEGER NOT NULL UNIQUE,
+        usuario TEXT UNIQUE,
         email TEXT NOT NULL COLLATE NOCASE UNIQUE,
         telefone_informado TEXT,
         senha_hash TEXT NOT NULL,
@@ -93,6 +94,11 @@ def init_schema() -> None:
     CREATE INDEX IF NOT EXISTS idx_comprovantes_itens_titulo ON comprovantes_pagamento_itens(titulo_receber_id);
     """)
     from database import add_column_if_missing
+    add_column_if_missing(db, 'clientes_acessos', 'usuario', 'TEXT')
+    try:
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_acessos_usuario ON clientes_acessos(usuario);")
+    except Exception:
+        pass
     for name, definition in (
         ('valor_base_centavos','INTEGER'),('data_base_atraso','TEXT'),
         ('dias_atraso','INTEGER NOT NULL DEFAULT 0'),
@@ -265,7 +271,7 @@ def load_portal_user():
     g.portal_access=None
     aid=session.get('cliente_acesso_id')
     if aid is None: return
-    row=get_db().execute("""SELECT ca.id,ca.cliente_id,ca.email,ca.status,c.nome cliente_nome,c.ativo cliente_ativo FROM clientes_acessos ca JOIN clientes c ON c.id=ca.cliente_id WHERE ca.id=?""",(aid,)).fetchone()
+    row=get_db().execute("""SELECT ca.id,ca.cliente_id,ca.usuario,ca.email,ca.status,c.nome cliente_nome,c.ativo cliente_ativo FROM clientes_acessos ca JOIN clientes c ON c.id=ca.cliente_id WHERE ca.id=?""",(aid,)).fetchone()
     if row is None or row['status']!='ATIVO' or not row['cliente_ativo']:
         session.pop('cliente_acesso_id',None); return
     g.portal_access=row
@@ -461,29 +467,70 @@ def register():
 
     return render_template('portal/cadastro.html', form=form)
 
-@bp.route('/portal/login',methods=['GET','POST'])
+@bp.route('/portal/login', methods=['GET', 'POST'])
 def login():
-    email=request.form.get('email','').strip().lower()
-    if request.method=='POST':
-        password=request.form.get('senha',''); db=get_db(); row=db.execute("SELECT ca.*,c.nome cliente_nome,c.ativo cliente_ativo FROM clientes_acessos ca JOIN clientes c ON c.id=ca.cliente_id WHERE lower(ca.email)=lower(?) LIMIT 1",(email,)).fetchone(); now=datetime.now(); blocked=False
+    login_val = (request.form.get('login') or request.form.get('email') or '').strip().lower()
+    if request.method == 'POST':
+        password = request.form.get('senha', '')
+        db = get_db()
+        row = db.execute(
+            """
+            SELECT ca.*, c.nome cliente_nome, c.ativo cliente_ativo
+              FROM clientes_acessos ca
+              JOIN clientes c ON c.id = ca.cliente_id
+             WHERE lower(ca.email) = lower(?)
+                OR (ca.usuario IS NOT NULL AND lower(ca.usuario) = lower(?))
+             LIMIT 1
+            """,
+            (login_val, login_val),
+        ).fetchone()
+        now = datetime.now()
+        blocked = False
         if row is not None and row['bloqueado_ate']:
-            try: blocked=datetime.fromisoformat(row['bloqueado_ate'])>now
-            except ValueError: blocked=False
-        ok=bool(row and row['cliente_ativo'] and not blocked and check_password_hash(row['senha_hash'],password))
+            try:
+                blocked = datetime.fromisoformat(row['bloqueado_ate']) > now
+            except ValueError:
+                blocked = False
+        ok = bool(row and row['cliente_ativo'] and not blocked and check_password_hash(row['senha_hash'], password))
         if not ok:
             if row is not None and not blocked:
-                fails=int(row['tentativas_falhas'] or 0)+1; until=None
-                if fails>=5: until=(now+timedelta(minutes=15)).isoformat(timespec='seconds'); fails=0
-                db.execute("UPDATE clientes_acessos SET tentativas_falhas=?,bloqueado_ate=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",(fails,until,row['id'])); db.commit()
-            flash('E-mail ou senha inválidos. Se houver bloqueio temporário, aguarde alguns minutos e tente novamente.','danger'); return render_template('portal/login.html',email=email),401
-        if row['status']!='ATIVO':
-            flash('Seu acesso está aguardando aprovação do administrador.' if row['status']=='PENDENTE' else 'Este acesso não está disponível.','warning'); return render_template('portal/login.html',email=email),403
-        csrf=session.get('csrf_token'); admin=session.get('usuario_id'); session.clear();
-        if csrf: session['csrf_token']=csrf
-        if admin: session['usuario_id']=admin
-        session['cliente_acesso_id']=row['id']; session.permanent=True
-        db.execute("UPDATE clientes_acessos SET tentativas_falhas=0,bloqueado_ate=NULL,ultimo_login_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?",(row['id'],)); db.commit(); return redirect(url_for('portal.dashboard'))
-    return render_template('portal/login.html',email=email)
+                fails = int(row['tentativas_falhas'] or 0) + 1
+                until = None
+                if fails >= 5:
+                    until = (now + timedelta(minutes=15)).isoformat(timespec='seconds')
+                    fails = 0
+                db.execute(
+                    "UPDATE clientes_acessos SET tentativas_falhas=?, bloqueado_ate=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (fails, until, row['id']),
+                )
+                db.commit()
+            flash(
+                'E-mail/usuário ou senha inválidos. Se houver bloqueio temporário, aguarde alguns minutos e tente novamente.',
+                'danger',
+            )
+            return render_template('portal/login.html', login=login_val, email=login_val), 401
+        if row['status'] != 'ATIVO':
+            flash(
+                'Seu acesso está aguardando aprovação do administrador.' if row['status'] == 'PENDENTE' else 'Este acesso não está disponível.',
+                'warning',
+            )
+            return render_template('portal/login.html', login=login_val, email=login_val), 403
+        csrf = session.get('csrf_token')
+        admin = session.get('usuario_id')
+        session.clear()
+        if csrf:
+            session['csrf_token'] = csrf
+        if admin:
+            session['usuario_id'] = admin
+        session['cliente_acesso_id'] = row['id']
+        session.permanent = True
+        db.execute(
+            "UPDATE clientes_acessos SET tentativas_falhas=0, bloqueado_ate=NULL, ultimo_login_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (row['id'],),
+        )
+        db.commit()
+        return redirect(url_for('portal.dashboard'))
+    return render_template('portal/login.html', login=login_val, email=login_val)
 
 
 @bp.post('/portal/logout')
@@ -885,7 +932,7 @@ def client_file(proof_id):
 def admin_accesses():
     if getattr(g,'usuario',None) is None: return redirect(url_for('login'))
     rows=get_db().execute("""
-        SELECT ca.id,ca.email,ca.telefone_informado,ca.status,
+        SELECT ca.id,ca.usuario,ca.email,ca.telefone_informado,ca.status,
                ca.contato_validado,ca.solicitado_at,ca.aprovado_at,
                ca.ultimo_login_at,ca.observacao_admin,
                c.id cliente_id,c.nome cliente_nome,
@@ -906,6 +953,178 @@ def admin_accesses():
 def _admin_required():
     if getattr(g,'usuario',None) is None: return redirect(url_for('login'))
     return None
+
+
+@bp.route('/acessos-clientes/novo', methods=['GET', 'POST'])
+def new_access():
+    r = _admin_required()
+    if r:
+        return r
+
+    db = get_db()
+    cliente_id_param = request.args.get('cliente_id') or request.form.get('cliente_id')
+    selected_cliente_id = None
+    if cliente_id_param:
+        try:
+            selected_cliente_id = int(cliente_id_param)
+        except (ValueError, TypeError):
+            selected_cliente_id = None
+
+    if selected_cliente_id:
+        existing = db.execute(
+            "SELECT id FROM clientes_acessos WHERE cliente_id = ?",
+            (selected_cliente_id,),
+        ).fetchone()
+        if existing:
+            flash("Este cliente já possui credencial cadastrada. Você pode gerenciá-la abaixo.", "info")
+            return redirect(url_for('portal.edit_access', aid=existing['id']))
+
+    clientes_sem_acesso = db.execute(
+        """
+        SELECT c.id, c.nome, c.cpf, c.email, c.telefone
+          FROM clientes c
+          LEFT JOIN clientes_acessos ca ON ca.cliente_id = c.id
+         WHERE c.ativo = 1 AND ca.id IS NULL
+         ORDER BY c.nome
+        """
+    ).fetchall()
+
+    cliente_pre = None
+    if selected_cliente_id:
+        cliente_pre = db.execute(
+            "SELECT id, nome, cpf, email, telefone FROM clientes WHERE id = ? AND ativo = 1",
+            (selected_cliente_id,),
+        ).fetchone()
+
+    default_email = cliente_pre['email'] if cliente_pre and cliente_pre['email'] else ''
+    default_phone = cliente_pre['telefone'] if cliente_pre and cliente_pre['telefone'] else ''
+
+    form = {
+        'cliente_id': selected_cliente_id or '',
+        'usuario': request.form.get('usuario', '').strip().lower(),
+        'email': request.form.get('email', default_email).strip().lower(),
+        'telefone': request.form.get('telefone', default_phone),
+        'status': request.form.get('status', 'ATIVO').strip().upper(),
+        'observacao_admin': request.form.get('observacao_admin', '').strip(),
+    }
+
+    if request.method == 'POST':
+        cid = parse_int(request.form.get('cliente_id'))
+        usuario = form['usuario']
+        email = form['email']
+        phone = only_digits(form['telefone'])
+        status = form['status']
+        observation = form['observacao_admin']
+        senha = request.form.get('senha', '')
+        confirmar_senha = request.form.get('confirmar_senha', '')
+        admin_password = request.form.get('senha_confirmacao', '')
+        errors = []
+
+        client_row = None
+        if not cid:
+            errors.append('Selecione o cliente.')
+        else:
+            client_row = db.execute("SELECT id, nome, email, telefone, ativo FROM clientes WHERE id = ?", (cid,)).fetchone()
+            if not client_row or not client_row['ativo']:
+                errors.append('Cliente selecionado é inválido ou está inativo.')
+            else:
+                existing = db.execute("SELECT id FROM clientes_acessos WHERE cliente_id = ?", (cid,)).fetchone()
+                if existing:
+                    errors.append('Este cliente já possui credencial de acesso cadastrada.')
+
+        if not usuario:
+            errors.append('Informe o nome de usuário.')
+        elif len(usuario) < 3 or len(usuario) > 30:
+            errors.append('O nome de usuário deve ter entre 3 e 30 caracteres.')
+        elif not re.fullmatch(r"[a-z0-9._-]+", usuario):
+            errors.append('O nome de usuário pode conter apenas letras minúsculas, números, ponto, hífen e sublinhado.')
+        else:
+            conflict_user = db.execute("SELECT id FROM clientes_acessos WHERE lower(usuario) = lower(?) LIMIT 1", (usuario,)).fetchone()
+            if conflict_user:
+                errors.append('Este nome de usuário já está associado a outro acesso.')
+
+        if not valid_email(email):
+            errors.append('Informe um e-mail válido.')
+        else:
+            conflict_email = db.execute("SELECT id FROM clientes_acessos WHERE lower(email) = lower(?) LIMIT 1", (email,)).fetchone()
+            if conflict_email:
+                errors.append('Este e-mail já está associado a outro acesso.')
+
+        if status not in {'PENDENTE', 'ATIVO', 'BLOQUEADO'}:
+            errors.append('Status de acesso inválido.')
+
+        if len(senha) < 8:
+            errors.append('A senha deve ter pelo menos 8 caracteres.')
+        elif senha != confirmar_senha:
+            errors.append('A confirmação da senha não confere.')
+
+        if not validar_senha_usuario_atual(admin_password):
+            errors.append('Sua senha de administrador é inválida.')
+
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+        else:
+            matched = int(
+                bool(client_row['email'] and str(client_row['email']).strip().lower() == email)
+                or bool(client_row['telefone'] and only_digits(client_row['telefone']) == phone)
+            )
+            senha_hash = generate_password_hash(senha)
+            approved_at = datetime.now().isoformat(sep=' ', timespec='seconds') if status == 'ATIVO' else None
+            approved_by = g.usuario['id'] if status == 'ATIVO' else None
+
+            try:
+                cur = db.execute(
+                    """
+                    INSERT INTO clientes_acessos (
+                        cliente_id, usuario, email, telefone_informado, senha_hash,
+                        status, contato_validado, observacao_admin, aprovado_at,
+                        aprovado_por_usuario_id, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """,
+                    (
+                        cid,
+                        usuario,
+                        email,
+                        phone or None,
+                        senha_hash,
+                        status,
+                        matched,
+                        observation or None,
+                        approved_at,
+                        approved_by,
+                    ),
+                )
+                access_id = int(cur.lastrowid)
+                registrar_auditoria(
+                    db,
+                    'cliente_acesso',
+                    access_id,
+                    'CRIADO_ADMIN',
+                    json.dumps(
+                        {
+                            'cliente_id': cid,
+                            'usuario': usuario,
+                            'email': email,
+                            'status': status,
+                            'contato_validado': bool(matched),
+                        },
+                        ensure_ascii=False,
+                    ),
+                )
+                db.commit()
+                flash('Credencial de acesso criada com sucesso para o cliente.', 'success')
+                return redirect(url_for('portal.admin_accesses'))
+            except sqlite3.IntegrityError:
+                db.rollback()
+                flash('Não foi possível salvar o acesso devido a conflito de dados (usuário ou e-mail duplicado).', 'danger')
+
+    return render_template(
+        'portal_admin/acesso_novo.html',
+        clientes=clientes_sem_acesso,
+        cliente_pre=cliente_pre,
+        form=form,
+    )
 
 
 @bp.route('/acessos-clientes/<int:aid>/editar',methods=['GET','POST'])
@@ -929,6 +1148,7 @@ def edit_access(aid):
         abort(404)
 
     form = {
+        'usuario': request.form.get('usuario', access['usuario'] or '').strip().lower(),
         'email': request.form.get('email', access['email']),
         'telefone': request.form.get(
             'telefone',
@@ -942,6 +1162,7 @@ def edit_access(aid):
     }
 
     if request.method == 'POST':
+        usuario = form['usuario']
         email = form['email'].strip().lower()
         phone = only_digits(form['telefone'])
         status = form['status'].strip().upper()
@@ -951,14 +1172,27 @@ def edit_access(aid):
         admin_password = request.form.get('senha_confirmacao', '')
         errors = []
 
+        if usuario:
+            if len(usuario) < 3 or len(usuario) > 30:
+                errors.append('O nome de usuário deve ter entre 3 e 30 caracteres.')
+            elif not re.fullmatch(r"[a-z0-9._-]+", usuario):
+                errors.append('O nome de usuário pode conter apenas letras minúsculas, números, ponto, hífen e sublinhado.')
+            else:
+                conflicting_user = db.execute(
+                    "SELECT id FROM clientes_acessos WHERE lower(usuario)=lower(?) AND id<>? LIMIT 1",
+                    (usuario, aid),
+                ).fetchone()
+                if conflicting_user is not None:
+                    errors.append('Este nome de usuário já está associado a outro acesso.')
+
         if not valid_email(email):
             errors.append('Informe um e-mail válido.')
         if status not in {'PENDENTE', 'ATIVO', 'BLOQUEADO'}:
             errors.append('Status de acesso inválido.')
         if new_password:
-            if len(new_password) < 10:
+            if len(new_password) < 8:
                 errors.append(
-                    'A nova senha deve ter pelo menos 10 caracteres.'
+                    'A nova senha deve ter pelo menos 8 caracteres.'
                 )
             if new_password != confirm_password:
                 errors.append('A confirmação da nova senha não confere.')
@@ -982,6 +1216,7 @@ def edit_access(aid):
                 flash(error, 'danger')
         else:
             before = {
+                'usuario': access['usuario'],
                 'email': access['email'],
                 'telefone_informado': access['telefone_informado'],
                 'status': access['status'],
@@ -1018,7 +1253,7 @@ def edit_access(aid):
                 db.execute(
                     """
                     UPDATE clientes_acessos
-                       SET email=?, telefone_informado=?, senha_hash=?,
+                       SET usuario=?, email=?, telefone_informado=?, senha_hash=?,
                            status=?, contato_validado=?,
                            observacao_admin=?, aprovado_at=?,
                            aprovado_por_usuario_id=?,
@@ -1027,6 +1262,7 @@ def edit_access(aid):
                      WHERE id=?
                     """,
                     (
+                        usuario or None,
                         email,
                         phone or None,
                         password_hash,
@@ -1047,6 +1283,7 @@ def edit_access(aid):
                         {
                             'antes': before,
                             'depois': {
+                                'usuario': usuario or None,
                                 'email': email,
                                 'telefone_informado': phone or None,
                                 'status': status,
@@ -1062,7 +1299,7 @@ def edit_access(aid):
             except sqlite3.IntegrityError:
                 db.rollback()
                 flash(
-                    'Não foi possível salvar. Verifique se o e-mail já está '
+                    'Não foi possível salvar. Verifique se o e-mail ou o usuário já está '
                     'associado a outro acesso.',
                     'danger',
                 )

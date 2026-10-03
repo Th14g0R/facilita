@@ -1903,7 +1903,7 @@ def register_routes(app: Flask) -> None:
 
         acesso_portal = db.execute(
             """
-            SELECT ca.id, ca.email, ca.telefone_informado, ca.status,
+            SELECT ca.id, ca.usuario, ca.email, ca.telefone_informado, ca.status,
                    ca.contato_validado, ca.solicitado_at, ca.aprovado_at,
                    ca.ultimo_login_at, ca.observacao_admin
               FROM clientes_acessos ca
