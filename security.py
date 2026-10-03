@@ -31,7 +31,7 @@ def register_public_limits(app, get_db):
                 db.commit()
                 return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.', 429, {'Retry-After': str(max(1,window-(now-row['inicio'])))}
             db.execute('''INSERT INTO limites_publicos(chave,inicio,tentativas) VALUES(?,?,1)
-                ON CONFLICT(chave) DO UPDATE SET tentativas=tentativas+1''', (key,now))
+                ON CONFLICT(chave) DO UPDATE SET tentativas = limites_publicos.tentativas + 1''', (key,now))
             db.commit()
         except BaseException:
             db.rollback()

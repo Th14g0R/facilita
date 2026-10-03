@@ -52,12 +52,14 @@ class PostgresCursorWrapper:
         # Remove COLLATE NOCASE em PostgreSQL para evitar dependencia de collation
         if "COLLATE NOCASE" in converted_sql.upper():
             converted_sql = re.sub(r"\s+COLLATE\s+NOCASE", "", converted_sql, flags=re.IGNORECASE)
-        if is_insert and not has_returning:
+        is_limites = "LIMITES_PUBLICOS" in upper
+        should_return_id = is_insert and not has_returning and not is_limites
+        if should_return_id:
             converted_sql = converted_sql.rstrip(" ;") + " RETURNING id;"
 
         self.cur.execute(converted_sql, params or ())
 
-        if is_insert and not has_returning:
+        if should_return_id:
             try:
                 row = self.cur.fetchone()
                 self._lastrowid = row[0] if row else None
