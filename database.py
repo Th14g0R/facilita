@@ -6,6 +6,113 @@ from flask import g
 from financial_rules import install_guards
 from transactions import Connection
 
+import os
+import re
+
+try:
+    import psycopg2
+    import psycopg2.extras
+    import psycopg2.extensions
+except ImportError:
+    psycopg2 = None
+
+def get_database_url() -> str | None:
+    from flask import current_app
+    return os.environ.get("DATABASE_URL") or current_app.config.get("DATABASE_URL")
+
+def is_postgres() -> bool:
+    url = get_database_url()
+    return bool(url and (url.startswith("postgresql://") or url.startswith("postgres://")))
+
+class PostgresCursorWrapper:
+    def __init__(self, cur):
+        self.cur = cur
+        self._lastrowid = None
+
+    def execute(self, sql, params=None):
+        clean = sql.strip()
+        upper = clean.upper()
+
+        if upper.startswith("PRAGMA"):
+            m = re.match(r"PRAGMA\s+table_info\(([^)]+)\)", clean, re.IGNORECASE)
+            if m:
+                tbl = m.group(1).strip(' "`').lower()
+                self.cur.execute("SELECT column_name AS name FROM information_schema.columns WHERE table_name = %s", (tbl,))
+            else:
+                self.cur.execute("SELECT 1 WHERE 1=0;")
+            return self
+
+        if upper in ("BEGIN IMMEDIATE", "BEGIN"):
+            return self
+
+        is_insert = upper.startswith("INSERT INTO")
+        has_returning = "RETURNING" in upper
+
+        converted_sql = sql.replace("?", "%s")
+        if is_insert and not has_returning:
+            converted_sql = converted_sql.rstrip(" ;") + " RETURNING id;"
+
+        self.cur.execute(converted_sql, params or ())
+
+        if is_insert and not has_returning:
+            try:
+                row = self.cur.fetchone()
+                self._lastrowid = row[0] if row else None
+            except Exception:
+                self._lastrowid = None
+        else:
+            self._lastrowid = None
+
+        return self
+
+    @property
+    def lastrowid(self):
+        return self._lastrowid
+
+    def fetchone(self):
+        return self.cur.fetchone()
+
+    def fetchall(self):
+        return self.cur.fetchall()
+
+    def __iter__(self):
+        return iter(self.cur)
+
+class PostgresConnection:
+    def __init__(self, uri: str):
+        if not psycopg2:
+            raise RuntimeError("psycopg2-binary é necessário para conexões PostgreSQL.")
+        # Tratamento de prefixo postgres:// para postgresql:// se necessário
+        if uri.startswith("postgres://"):
+            uri = "postgresql://" + uri[len("postgres://"):]
+        self._conn = psycopg2.connect(uri)
+        self.defer_commit = False
+
+    def cursor(self):
+        return PostgresCursorWrapper(self._conn.cursor(cursor_factory=psycopg2.extras.DictCursor))
+
+    def execute(self, sql, params=None):
+        cur = self.cursor()
+        return cur.execute(sql, params)
+
+    def commit(self):
+        if not self.defer_commit:
+            self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    def executescript(self, script: str):
+        pass
+
+    @property
+    def in_transaction(self):
+        return self._conn.status == psycopg2.extensions.STATUS_IN_TRANSACTION
+
+
 
 def current_database_path() -> str:
     from flask import current_app
@@ -13,18 +120,21 @@ def current_database_path() -> str:
     return current_app.config["DATABASE"]
 
 
-def get_db() -> sqlite3.Connection:
+def get_db():
     if "db" not in g:
-        connection = sqlite3.connect(
-            current_database_path(),
-            timeout=10,
-            factory=Connection,
-        )
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON;")
-        connection.execute("PRAGMA journal_mode = WAL;")
-        connection.execute("PRAGMA busy_timeout = 5000;")
-        g.db = connection
+        if is_postgres():
+            g.db = PostgresConnection(get_database_url())
+        else:
+            connection = sqlite3.connect(
+                current_database_path(),
+                timeout=10,
+                factory=Connection,
+            )
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            connection.execute("PRAGMA journal_mode = WAL;")
+            connection.execute("PRAGMA busy_timeout = 5000;")
+            g.db = connection
 
     return g.db
 
@@ -37,6 +147,8 @@ def close_db(error: BaseException | None = None) -> None:
 
 def init_db() -> None:
     """Cria o schema caso ainda não exista. Não apaga dados existentes."""
+    if is_postgres():
+        return
     db = get_db()
 
     db.executescript(
