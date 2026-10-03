@@ -5,6 +5,7 @@
 <h1>A receber</h1>
 </div>
 <div class="actions">
+<a class="button" href="{{ url_for('titulos_receber_relatorio') }}">Cobrar cliente</a>
 <a class="button primary" href="{{ url_for('pagamentos_integrados_novo') }}">Registrar pagamento</a>
 </div>
 </header>
@@ -28,4 +29,4 @@
 </form>
 </details>
 <p class="muted">Até 500 títulos por consulta. Use os filtros para localizar um período específico.</p>
-<a href="{{ url_for('titulos_receber_relatorio') }}">Relatório de cobrança por cliente →</a>{% endblock %}
+<a href="{{ url_for('titulos_receber_relatorio') }}">Cobrar cliente →</a>{% endblock %}

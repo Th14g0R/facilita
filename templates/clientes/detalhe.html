@@ -5,6 +5,7 @@
 <h1>{{ cliente.nome }}</h1>
 </div>
 <div class="actions">
+<a class="button" href="{{ url_for('titulos_receber_relatorio',cliente_id=cliente.id) }}">Cobrar cliente</a>
 <a class="button" href="{{ url_for('clientes_editar',cliente_id=cliente.id) }}">Editar cliente</a>
 <a class="button primary" href="{{ url_for('emprestimos_novo',cliente_id=cliente.id) }}">Nova operação</a>
 </div>
@@ -15,6 +16,7 @@
 <a href="{{ url_for('clientes_editar',cliente_id=cliente.id) }}">Editar cadastro</a>
 <a href="{{ url_for('contas_nova',cliente_id=cliente.id) }}">Adicionar conta</a>
 <a href="{{ url_for('relatorio_cliente',cliente_id=cliente.id) }}">Extrato completo</a>
+<a href="{{ url_for('titulos_receber_relatorio',cliente_id=cliente.id) }}">Cobrar cliente</a>
 </div>
 </section>
 <section class="panel">

@@ -3553,8 +3553,9 @@ def register_routes(app: Flask) -> None:
         )
 
 
-    # -------------------- Relatório de contas a receber por cliente --------------------
+    # -------------------- Cobrar cliente / Enviar cobrança --------------------
 
+    @app.get("/receber/cobrar")
     @app.get("/receber/relatorio")
     @login_required
     def titulos_receber_relatorio():
@@ -3580,12 +3581,16 @@ def register_routes(app: Flask) -> None:
         data_fim_text = request.args.get("data_fim", "").strip()
         pix_conta_id = parse_int(request.args.get("pix_conta_id"))
         pix_manual = request.args.get("pix_manual", "").strip()
+        filtrado_selecao = "filtrado_selecao" in request.args
 
         cliente = None
         titulos: list[sqlite3.Row] = []
         cobraveis: list[dict[str, Any]] = []
+        cobraveis_selecionados: list[dict[str, Any]] = []
+        titulos_selecionados_ids: set[str] = set()
         mensagem_cobranca = ""
         whatsapp_url = ""
+        telegram_url = ""
         resumo = {
             "quantidade": 0,
             "valor_total_centavos": 0,
@@ -3593,6 +3598,8 @@ def register_routes(app: Flask) -> None:
             "saldo_em_aberto_centavos": 0,
             "quantidade_cobravel": 0,
             "total_cobravel_centavos": 0,
+            "quantidade_selecionada": 0,
+            "total_selecionado_centavos": 0,
         }
 
         data_inicio = parse_iso_date(data_inicio_text)
@@ -3722,6 +3729,23 @@ def register_routes(app: Flask) -> None:
                 for item in cobraveis
             )
 
+            # Seleção de títulos para cobrança
+            raw_selecionados = request.args.getlist("titulo_id")
+            if filtrado_selecao:
+                titulos_selecionados_ids = set(raw_selecionados)
+            else:
+                titulos_selecionados_ids = {str(item["id"]) for item in cobraveis}
+
+            cobraveis_selecionados = [
+                item for item in cobraveis
+                if str(item["id"]) in titulos_selecionados_ids
+            ]
+
+            total_selecionado = sum(
+                int(item["saldo_em_aberto_centavos"])
+                for item in cobraveis_selecionados
+            )
+
             resumo = {
                 "quantidade": len(titulos),
                 "valor_total_centavos": valor_total,
@@ -3729,12 +3753,14 @@ def register_routes(app: Flask) -> None:
                 "saldo_em_aberto_centavos": saldo_aberto,
                 "quantidade_cobravel": len(cobraveis),
                 "total_cobravel_centavos": total_cobravel,
+                "quantidade_selecionada": len(cobraveis_selecionados),
+                "total_selecionado_centavos": total_selecionado,
             }
 
-            if cobraveis:
+            if cobraveis_selecionados:
                 mensagem_cobranca = build_receivables_collection_message(
                     cliente["nome"],
-                    cobraveis,
+                    cobraveis_selecionados,
                     pix_key or None,
                 )
 
@@ -3755,12 +3781,16 @@ def register_routes(app: Flask) -> None:
                         f"https://wa.me/?text={encoded_message}"
                     )
 
+                telegram_url = f"https://t.me/share/url?text={encoded_message}"
+
         return render_template(
             "receber/relatorio_cliente.html",
             clientes=clientes,
             cliente=cliente,
             titulos=titulos,
             cobraveis=cobraveis,
+            cobraveis_selecionados=cobraveis_selecionados,
+            titulos_selecionados_ids=titulos_selecionados_ids,
             resumo=resumo,
             status=status,
             data_inicio=data_inicio_text,
@@ -3771,6 +3801,7 @@ def register_routes(app: Flask) -> None:
             pix_key=pix_key,
             mensagem_cobranca=mensagem_cobranca,
             whatsapp_url=whatsapp_url,
+            telegram_url=telegram_url,
         )
 
 
@@ -5968,7 +5999,7 @@ def build_receivables_collection_message(
 
         lines.append(
             f"- {vencimento} | {natureza} {competencia} | "
-            f"Empréstimo #{item['emprestimo_id']} | "
+            f"Operação #{item['emprestimo_id']} | "
             f"{format_money(saldo)} | {status}"
         )
 

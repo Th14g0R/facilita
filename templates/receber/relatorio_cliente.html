@@ -1,15 +1,332 @@
-{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}Relatório de cobrança{% endblock %}{% block content %}<header class="page-heading">
-<div>
-<p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>Relatório de cobrança</h1>
-</div>
-<div class="actions">
-</div>
+{% extends 'base.html' %}
+{% from '_macros.html' import field, select, csrf with context %}
+{% block title %}Cobrar cliente{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">CONTROLE FINANCEIRO</p>
+    <h1>Cobrar cliente</h1>
+  </div>
+  <div class="actions">
+    <a class="button" href="{{ url_for('titulos_receber_lista') }}">← Voltar para A receber</a>
+  </div>
 </header>
+
 <section class="panel">
-<form method="get" class="filters">{{ select('cliente_id','Cliente',clientes,cliente.id if cliente else '') }}{{ field('data_inicio','De',data_inicio,type='date') }}{{ field('data_fim','Até',data_fim,type='date') }}<button class="button">Consultar</button>
-</form>
+  <form method="get" class="filters" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+    <div style="flex:1; min-width:220px;">
+      {{ select('cliente_id', 'Cliente', clientes, cliente.id if cliente else '', required=true) }}
+    </div>
+    <div style="width:140px;">
+      {{ field('data_inicio', 'Vencimento de', data_inicio, type='date') }}
+    </div>
+    <div style="width:140px;">
+      {{ field('data_fim', 'Até', data_fim, type='date') }}
+    </div>
+    <div style="flex:1; min-width:200px;">
+      <label class="field" for="pix_conta_id">
+        <span>Chave PIX da conta</span>
+        <select name="pix_conta_id" id="pix_conta_id">
+          <option value="">Nenhuma / Manual</option>
+          {% for c in contas_pix %}
+          <option value="{{ c.id }}" {% if pix_conta_id == c.id %}selected{% endif %}>
+            {{ c.banco }} ({{ c.chave_pix }})
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div style="width:170px;">
+      {{ field('pix_manual', 'Ou PIX manual', pix_manual) }}
+    </div>
+    <div style="margin-bottom:2px;">
+      <button class="button primary" type="submit">Consultar</button>
+    </div>
+  </form>
 </section>
-<section class="panel">{{ table(titulos,[('emprestimo_id','Contrato'),('competencia','Competência'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')],'titulos_receber_detalhe','titulo_id') }}{% if mensagem_cobranca %}<h2>Mensagem de cobrança</h2>
-<pre>{{ mensagem_cobranca }}</pre>{% if whatsapp_url %}<a class="button" href="{{ whatsapp_url }}" target="_blank" rel="noopener">Abrir WhatsApp</a>{% endif %}{% endif %}</section>{% endblock %}
+
+{% if cliente %}
+<section class="panel" style="margin-top:16px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+    <div>
+      <h2 style="margin:0; font-size:1.15rem;">{{ cliente.nome }}</h2>
+      <p class="muted" style="margin:4px 0 0 0;">
+        Telefone: <strong>{{ cliente.telefone or 'Não informado' }}</strong>
+        {% if cliente.telefone %}
+        <span style="font-size:0.85em; color:var(--muted);">(usado para abrir conversa no WhatsApp)</span>
+        {% endif %}
+      </p>
+    </div>
+    <div class="actions">
+      <a class="button" href="{{ url_for('clientes_detalhe', cliente_id=cliente.id) }}">Ficha do cliente</a>
+    </div>
+  </div>
+
+  {% if not titulos %}
+  <div class="empty" style="padding:24px; text-align:center;">
+    Nenhum título encontrado para este cliente com os filtros aplicados.
+  </div>
+  {% else %}
+  <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <p class="muted" style="margin:0;">
+      Marque os títulos que deseja incluir na cobrança. A mensagem e os links atualizam automaticamente.
+    </p>
+    <div style="display:flex; gap:8px;">
+      <button type="button" class="button" id="btn_marcar_todos" style="padding:4px 10px; font-size:12px; min-height:auto;">Marcar todos</button>
+      <button type="button" class="button" id="btn_desmarcar_todos" style="padding:4px 10px; font-size:12px; min-height:auto;">Desmarcar todos</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="tabela_titulos">
+      <thead>
+        <tr>
+          <th style="width:36px; text-align:center;">
+            <input type="checkbox" id="check_todos" title="Selecionar todos" checked>
+          </th>
+          <th scope="col">Operação</th>
+          <th scope="col">Competência</th>
+          <th scope="col">Vencimento</th>
+          <th scope="col" class="money">Valor título</th>
+          <th scope="col" class="money">Saldo em aberto</th>
+          <th scope="col">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in titulos %}
+        {% set saldo = t.saldo_em_aberto_centavos if t.saldo_em_aberto_centavos is defined else (t.valor_previsto_centavos - (t.valor_recebido_centavos or 0)) %}
+        {% set cobravel = (t.status in ['PREVISTO', 'VENCIDO'] and saldo > 0) %}
+        <tr class="{% if not cobravel %}muted-row{% endif %}" style="{% if not cobravel %}opacity:0.6;{% endif %}">
+          <td style="text-align:center;">
+            {% if cobravel %}
+            <input type="checkbox"
+                   class="titulo-checkbox"
+                   name="titulo_id"
+                   value="{{ t.id }}"
+                   data-id="{{ t.id }}"
+                   data-operacao="{{ t.emprestimo_id }}"
+                   data-competencia="{{ t.competencia|competencia_br }}"
+                   data-vencimento="{{ t.data_vencimento|date_br }}"
+                   data-natureza="{{ 'Saldo de taxa' if t.natureza == 'SALDO_JUROS' else 'Taxa de serviço' }}"
+                   data-saldo-centavos="{{ saldo }}"
+                   data-status="{{ t.status|titulo_status }}"
+                   {% if t.id|string in titulos_selecionados_ids %}checked{% endif %}>
+            {% else %}
+            —
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('emprestimos_detalhe', emprestimo_id=t.emprestimo_id) }}">Operação #{{ t.emprestimo_id }}</a>
+          </td>
+          <td>{{ t.competencia|competencia_br }}</td>
+          <td>{{ t.data_vencimento|date_br }}</td>
+          <td class="money">{{ t.valor_previsto_centavos|money }}</td>
+          <td class="money"><strong>{{ saldo|money }}</strong></td>
+          <td>
+            <span class="badge {{ t.status|lower }}">{{ t.status|titulo_status }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="background:var(--surface-raised); border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:12px 16px; margin:16px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div>
+      <span id="contador_selecionados"><strong>{{ resumo.quantidade_selecionada }}</strong> títulos selecionados</span>
+      <span class="muted" style="margin:0 8px;">|</span>
+      <span>Total selecionado a cobrar: <strong id="valor_total_selecionado" style="color:var(--brand); font-size:1.15em;">{{ resumo.total_selecionado_centavos|money }}</strong></span>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px; background:var(--surface);">
+    <h3 style="margin-top:0; margin-bottom:8px;">Mensagem de cobrança formatada</h3>
+    <textarea id="texto_cobranca" rows="9" readonly style="width:100%; box-sizing:border-box; font-family:monospace; font-size:13px; line-height:1.5; padding:12px; border-radius:var(--radius-sm); border:1px solid var(--line-strong); background:var(--surface-raised); color:var(--ink); resize:vertical;">{{ mensagem_cobranca }}</textarea>
+
+    <div class="actions" style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      {% if whatsapp_url %}
+      <a id="btn_whatsapp" class="button whatsapp" href="{{ whatsapp_url }}" target="_blank" rel="noopener" style="background:#25D366; color:#fff; border-color:#25D366; font-weight:600;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle; margin-right:4px;"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-5.46-4.45-9.92-9.91-9.92zm.01 18.15c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.16 8.16 0 0 1-1.25-4.38c0-4.54 3.7-8.24 8.24-8.24 4.54 0 8.24 3.7 8.24 8.24 0 4.53-3.7 8.24-8.24 8.24zm4.52-6.17c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.12.17 1.78 2.72 4.31 3.81.6.26 1.07.42 1.44.54.61.19 1.16.17 1.6.1.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.29z"/></svg>
+        Enviar via WhatsApp
+      </a>
+      {% endif %}
+
+      {% if telegram_url %}
+      <a id="btn_telegram" class="button telegram" href="{{ telegram_url }}" target="_blank" rel="noopener" style="background:#229ED9; color:#fff; border-color:#229ED9; font-weight:600;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle; margin-right:4px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/></svg>
+        Enviar via Telegram
+      </a>
+      {% endif %}
+
+      <button type="button" id="btn_copiar" class="button" style="font-weight:600;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        Copiar mensagem
+      </button>
+      <span id="msg_copiado" style="display:none; color:var(--brand); font-weight:600; font-size:13px;">✓ Mensagem copiada!</span>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<script>
+(function() {
+  const clienteNome = {{ cliente.nome|tojson }};
+  const clienteTelefone = {{ (cliente.telefone or '')|tojson }};
+  const pixKey = {{ (pix_key or '')|tojson }};
+
+  function normalizePhone(phone) {
+    if (!phone) return "";
+    let digits = phone.replace(/\D/g, "");
+    if (digits.startsWith("0")) digits = digits.substring(1);
+    if (!digits.startsWith("55") && (digits.length === 10 || digits.length === 11)) {
+      digits = "55" + digits;
+    }
+    return digits;
+  }
+
+  function formatMoney(cents) {
+    const val = (cents / 100).toFixed(2);
+    const parts = val.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return "R$ " + parts.join(",");
+  }
+
+  function atualizarCobranca() {
+    const checks = Array.from(document.querySelectorAll(".titulo-checkbox:checked"));
+    const totalCents = checks.reduce((sum, el) => sum + parseInt(el.dataset.saldoCentavos || "0", 10), 0);
+    const count = checks.length;
+
+    // Atualiza contadores visuais
+    const elContador = document.getElementById("contador_selecionados");
+    const elTotal = document.getElementById("valor_total_selecionado");
+    if (elContador) elContador.innerHTML = `<strong>${count}</strong> título(s) selecionado(s)`;
+    if (elTotal) elTotal.textContent = formatMoney(totalCents);
+
+    // Constrói texto da mensagem
+    let lines = [];
+    if (count > 0) {
+      lines.push(`Olá, ${clienteNome}.`);
+      lines.push("");
+      lines.push("Segue o resumo dos títulos em aberto:");
+      checks.forEach(el => {
+        const venc = el.dataset.vencimento;
+        const nat = el.dataset.natureza;
+        const comp = el.dataset.competencia;
+        const op = el.dataset.operacao;
+        const saldoFmt = formatMoney(parseInt(el.dataset.saldoCentavos || "0", 10));
+        const st = el.dataset.status;
+        lines.push(`- ${venc} | ${nat} ${comp} | Operação #${op} | ${saldoFmt} | ${st}`);
+      });
+      lines.push("");
+      lines.push(`Total a receber: ${formatMoney(totalCents)}.`);
+      if (pixKey) {
+        lines.push("");
+        lines.push(`Chave PIX para pagamento: ${pixKey}`);
+      }
+    } else {
+      lines.push("Nenhum título selecionado para cobrança.");
+    }
+
+    const textoFinal = lines.join("\n");
+    const textarea = document.getElementById("texto_cobranca");
+    if (textarea) textarea.value = textoFinal;
+
+    const encoded = encodeURIComponent(textoFinal);
+    const phoneNorm = normalizePhone(clienteTelefone);
+
+    const btnWa = document.getElementById("btn_whatsapp");
+    if (btnWa) {
+      if (count > 0) {
+        btnWa.style.display = "inline-flex";
+        btnWa.href = phoneNorm ? `https://wa.me/${phoneNorm}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+      } else {
+        btnWa.style.display = "none";
+      }
+    }
+
+    const btnTg = document.getElementById("btn_telegram");
+    if (btnTg) {
+      if (count > 0) {
+        btnTg.style.display = "inline-flex";
+        btnTg.href = `https://t.me/share/url?text=${encoded}`;
+      } else {
+        btnTg.style.display = "none";
+      }
+    }
+
+    const btnCp = document.getElementById("btn_copiar");
+    if (btnCp) {
+      btnCp.disabled = (count === 0);
+    }
+  }
+
+  // Eventos de checkbox
+  document.querySelectorAll(".titulo-checkbox").forEach(chk => {
+    chk.addEventListener("change", function() {
+      const all = document.querySelectorAll(".titulo-checkbox");
+      const checked = document.querySelectorAll(".titulo-checkbox:checked");
+      const master = document.getElementById("check_todos");
+      if (master) {
+        master.checked = (all.length > 0 && checked.length === all.length);
+        master.indeterminate = (checked.length > 0 && checked.length < all.length);
+      }
+      atualizarCobranca();
+    });
+  });
+
+  const masterCheck = document.getElementById("check_todos");
+  if (masterCheck) {
+    masterCheck.addEventListener("change", function() {
+      document.querySelectorAll(".titulo-checkbox").forEach(c => c.checked = masterCheck.checked);
+      atualizarCobranca();
+    });
+  }
+
+  const btnMarcar = document.getElementById("btn_marcar_todos");
+  if (btnMarcar) {
+    btnMarcar.addEventListener("click", function() {
+      document.querySelectorAll(".titulo-checkbox").forEach(c => c.checked = true);
+      if (masterCheck) { masterCheck.checked = true; masterCheck.indeterminate = false; }
+      atualizarCobranca();
+    });
+  }
+
+  const btnDesmarcar = document.getElementById("btn_desmarcar_todos");
+  if (btnDesmarcar) {
+    btnDesmarcar.addEventListener("click", function() {
+      document.querySelectorAll(".titulo-checkbox").forEach(c => c.checked = false);
+      if (masterCheck) { masterCheck.checked = false; masterCheck.indeterminate = false; }
+      atualizarCobranca();
+    });
+  }
+
+  // Copiar mensagem
+  const btnCopiar = document.getElementById("btn_copiar");
+  if (btnCopiar) {
+    btnCopiar.addEventListener("click", function() {
+      const textarea = document.getElementById("texto_cobranca");
+      if (!textarea || !textarea.value) return;
+      navigator.clipboard.writeText(textarea.value).then(function() {
+        const feedback = document.getElementById("msg_copiado");
+        if (feedback) {
+          feedback.style.display = "inline";
+          setTimeout(function() { feedback.style.display = "none"; }, 3000);
+        }
+      }).catch(function() {
+        textarea.select();
+        document.execCommand("copy");
+        const feedback = document.getElementById("msg_copiado");
+        if (feedback) {
+          feedback.style.display = "inline";
+          setTimeout(function() { feedback.style.display = "none"; }, 3000);
+        }
+      });
+    });
+  }
+
+  // Inicialização
+  atualizarCobranca();
+})();
+</script>
+{% endif %}
+{% endblock %}
