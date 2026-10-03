@@ -1783,45 +1783,111 @@ def register_routes(app: Flask) -> None:
 
     # -------------------- Clientes --------------------
 
+    def _formatar_acesso_recente(ultimo_login: str | None, portal_id: int | None) -> str:
+        if not portal_id:
+            return "Sem acesso"
+        if not ultimo_login:
+            return "Nunca acessou"
+        try:
+            limpo = str(ultimo_login).replace("T", " ")[:19]
+            dt = datetime.fromisoformat(limpo)
+            agora = datetime.now()
+            delta = agora - dt
+            segundos = int(delta.total_seconds())
+
+            if segundos < 0:
+                return dt.strftime("%d/%m/%Y %H:%M")
+            if segundos < 3600:
+                minutos = max(1, segundos // 60)
+                return f"🟢 Há {minutos} min"
+            if segundos < 86400 and dt.date() == agora.date():
+                return f"🟢 Hoje às {dt.strftime('%H:%M')}"
+            if segundos < 172800 and dt.date() == (agora - timedelta(days=1)).date():
+                return f"Ontem às {dt.strftime('%H:%M')}"
+            if delta.days <= 7:
+                return f"Há {delta.days} dias"
+            return dt.strftime("%d/%m/%Y")
+        except Exception:
+            return str(ultimo_login)[:16]
+
     @app.get("/clientes")
     @login_required
     def clientes_lista():
         termo = request.args.get("q", "").strip()
         status = request.args.get("status", "ativos").strip().lower()
 
-        sql = """
-            SELECT id, nome, telefone, email, cpf, cidade, estado, ativo, created_at
-              FROM clientes
+        base_sql = """
+              FROM clientes c
+              LEFT JOIN clientes_acessos ca ON ca.cliente_id = c.id
              WHERE 1 = 1
         """
         params: list[Any] = []
 
         if status == "ativos":
-            sql += " AND ativo = 1"
+            base_sql += " AND c.ativo = 1"
         elif status == "inativos":
-            sql += " AND ativo = 0"
+            base_sql += " AND c.ativo = 0"
 
         if termo:
             like = f"%{termo}%"
-            sql += """
+            base_sql += """
                 AND (
-                    nome LIKE ? COLLATE NOCASE
-                    OR telefone LIKE ?
-                    OR email LIKE ? COLLATE NOCASE
-                    OR cpf LIKE ?
+                    c.nome LIKE ? COLLATE NOCASE
+                    OR c.telefone LIKE ?
+                    OR c.email LIKE ? COLLATE NOCASE
+                    OR c.cpf LIKE ?
                 )
             """
             params.extend([like, like, like, like])
 
-        sql += " ORDER BY nome COLLATE NOCASE"
-
         db = get_db()
-        total = db.execute("SELECT COUNT(*) FROM (" + sql + ")", params).fetchone()[0]
+        total = db.execute("SELECT COUNT(*) " + base_sql, params).fetchone()[0]
         pagina = max(1, parse_int(request.args.get("pagina")) or 1)
         pagina = min(pagina, max(1, (total + 49) // 50))
-        clientes = db.execute(sql + " LIMIT 50 OFFSET ?", [*params, (pagina - 1) * 50]).fetchall()
-        return render_template("clientes/lista.html", clientes=clientes, termo=termo,
-                               status=status, total=total, pagina=pagina)
+
+        # Consulta defensiva com fallback caso a coluna usuario ainda não exista
+        select_cols = """
+            SELECT c.id, c.nome, c.telefone, c.email, c.cpf, c.cidade, c.estado, c.ativo, c.created_at,
+                   ca.id AS portal_id,
+                   ca.usuario AS portal_usuario,
+                   ca.status AS portal_status,
+                   ca.ultimo_login_at AS portal_ultimo_login
+        """
+        order_clause = " ORDER BY c.nome COLLATE NOCASE LIMIT 50 OFFSET ?"
+        try:
+            raw_clientes = db.execute(select_cols + base_sql + order_clause, [*params, (pagina - 1) * 50]).fetchall()
+        except Exception:
+            if hasattr(db, "rollback"):
+                db.rollback()
+            fallback_cols = """
+                SELECT c.id, c.nome, c.telefone, c.email, c.cpf, c.cidade, c.estado, c.ativo, c.created_at,
+                       ca.id AS portal_id,
+                       NULL AS portal_usuario,
+                       ca.status AS portal_status,
+                       ca.ultimo_login_at AS portal_ultimo_login
+            """
+            raw_clientes = db.execute(fallback_cols + base_sql + order_clause, [*params, (pagina - 1) * 50]).fetchall()
+
+        clientes_formatados = []
+        for r in raw_clientes:
+            d = dict(r)
+            pid = d.get("portal_id")
+            usuario = d.get("portal_usuario")
+            if pid:
+                d["portal_usuario_formatado"] = usuario if usuario else (d.get("email") or "Cadastrado")
+            else:
+                d["portal_usuario_formatado"] = "—"
+            d["portal_acesso_formatado"] = _formatar_acesso_recente(d.get("portal_ultimo_login"), pid)
+            clientes_formatados.append(d)
+
+        return render_template(
+            "clientes/lista.html",
+            clientes=clientes_formatados,
+            termo=termo,
+            status=status,
+            total=total,
+            pagina=pagina,
+        )
 
     @app.route("/clientes/novo", methods=["GET", "POST"])
     @login_required
@@ -1901,17 +1967,38 @@ def register_routes(app: Flask) -> None:
             (cliente_id,),
         ).fetchall()
 
-        acesso_portal = db.execute(
-            """
-            SELECT ca.id, ca.usuario, ca.email, ca.telefone_informado, ca.status,
-                   ca.contato_validado, ca.solicitado_at, ca.aprovado_at,
-                   ca.ultimo_login_at, ca.observacao_admin
-              FROM clientes_acessos ca
-             WHERE ca.cliente_id = ?
-             LIMIT 1
-            """,
-            (cliente_id,),
-        ).fetchone()
+        acesso_portal = None
+        try:
+            acesso_portal = db.execute(
+                """
+                SELECT ca.id, ca.usuario, ca.email, ca.telefone_informado, ca.status,
+                       ca.contato_validado, ca.solicitado_at, ca.aprovado_at,
+                       ca.ultimo_login_at, ca.observacao_admin
+                  FROM clientes_acessos ca
+                 WHERE ca.cliente_id = ?
+                 LIMIT 1
+                """,
+                (cliente_id,),
+            ).fetchone()
+        except Exception:
+            if hasattr(db, "rollback"):
+                db.rollback()
+            try:
+                acesso_portal = db.execute(
+                    """
+                    SELECT ca.id, NULL AS usuario, ca.email, ca.telefone_informado, ca.status,
+                           ca.contato_validado, ca.solicitado_at, ca.aprovado_at,
+                           ca.ultimo_login_at, ca.observacao_admin
+                      FROM clientes_acessos ca
+                     WHERE ca.cliente_id = ?
+                     LIMIT 1
+                    """,
+                    (cliente_id,),
+                ).fetchone()
+            except Exception:
+                if hasattr(db, "rollback"):
+                    db.rollback()
+                acesso_portal = None
 
         return render_template(
             "clientes/detalhe.html",

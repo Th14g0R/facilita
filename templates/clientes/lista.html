@@ -19,6 +19,6 @@
 </label>
 <button class="button">Filtrar</button>
 <a href="{{ request.path }}">Limpar</a>
-</form>{{ table(clientes,[('nome', 'Nome'), ('cpf', 'CPF'), ('telefone', 'Telefone'), ('email', 'E-mail')],'clientes_detalhe','cliente_id') }}</section>
+</form>{{ table(clientes,[('nome', 'Cliente'), ('cpf', 'CPF'), ('telefone', 'Telefone'), ('portal_usuario_formatado', 'Usuário Portal'), ('portal_acesso_formatado', 'Acesso recente')],'clientes_detalhe','cliente_id') }}</section>
 <nav class="pagination" aria-label="Paginação">
 <span>{{ total }} clientes · Página {{ pagina }}</span>{% if pagina>1 %}<a href="{{ url_for('clientes_lista',q=termo,status=status,pagina=pagina-1) }}">← Anterior</a>{% endif %}{% if pagina*50<total %}<a href="{{ url_for('clientes_lista',q=termo,status=status,pagina=pagina+1) }}">Próxima →</a>{% endif %}</nav>{% endblock %}

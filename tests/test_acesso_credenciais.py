@@ -112,6 +112,44 @@ class AcessoCredenciaisTest(fixture.ApplicationTests):
         )
         self.assertEqual(login_res.status_code, 302)
 
+    def test_clientes_lista_e_detalhe_e_edicao(self):
+        # 1. Acesso à listagem de clientes
+        res_lista = self.client.get('/clientes')
+        self.assertEqual(res_lista.status_code, 200)
+        html_lista = res_lista.get_data(as_text=True)
+        self.assertIn('Usuário Portal', html_lista)
+        self.assertIn('Acesso recente', html_lista)
+
+        # 2. Acesso aos detalhes do cliente 1
+        res_detalhe = self.client.get('/clientes/1')
+        self.assertEqual(res_detalhe.status_code, 200)
+        html_detalhe = res_detalhe.get_data(as_text=True)
+        self.assertIn('Editar cliente', html_detalhe)
+        self.assertIn('Acesso ao Portal', html_detalhe)
+
+        # 3. Acesso à edição do cliente 1
+        res_edit_get = self.client.get('/clientes/1/editar')
+        self.assertEqual(res_edit_get.status_code, 200)
+        self.assertIn('Editar cliente', res_edit_get.get_data(as_text=True))
+
+        # 4. Salvar edição do cliente
+        edit_form = {
+            'csrf_token': 'csrf-test',
+            'nome': 'Cliente Nome Alterado',
+            'cpf': '52998224725',
+            'telefone': '85988887777',
+            'email': 'alterado@example.com',
+            'endereco': 'Rua Teste 123',
+            'cidade': 'Fortaleza',
+            'estado': 'CE',
+            'cep': '60000000',
+            'observacoes': 'Observação teste',
+        }
+        res_edit_post = self.client.post('/clientes/1/editar', data=edit_form, follow_redirects=True)
+        self.assertEqual(res_edit_post.status_code, 200)
+        self.assertIn('Cliente atualizado com sucesso', res_edit_post.get_data(as_text=True))
+        self.assertIn('Cliente Nome Alterado', res_edit_post.get_data(as_text=True))
+
 
 if __name__ == '__main__':
     unittest.main()

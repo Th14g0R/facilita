@@ -5,6 +5,7 @@
 <h1>{{ titulo }}</h1>
 </div>
 <div class="actions">
+<a class="button" href="{{ url_for('clientes_detalhe', cliente_id=cliente.id) if cliente and cliente.id else url_for('clientes_lista') }}">Voltar</a>
 </div>
 </header>
 <section class="panel">

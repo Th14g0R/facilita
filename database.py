@@ -119,6 +119,27 @@ class PostgresConnection:
 
 
 
+_pg_migrated = False
+
+def migrate_postgres(conn: PostgresConnection) -> None:
+    global _pg_migrated
+    if _pg_migrated or not psycopg2:
+        return
+    try:
+        old_level = conn._conn.isolation_level
+        conn._conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+        with conn._conn.cursor() as cur:
+            cur.execute("ALTER TABLE clientes_acessos ADD COLUMN IF NOT EXISTS usuario TEXT;")
+            try:
+                cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_acessos_usuario ON clientes_acessos(usuario);")
+            except Exception:
+                pass
+        conn._conn.set_isolation_level(old_level)
+        _pg_migrated = True
+    except Exception:
+        pass
+
+
 def current_database_path() -> str:
     from flask import current_app
 
@@ -129,6 +150,7 @@ def get_db():
     if "db" not in g:
         if is_postgres():
             g.db = PostgresConnection(get_database_url())
+            migrate_postgres(g.db)
         else:
             connection = sqlite3.connect(
                 current_database_path(),
