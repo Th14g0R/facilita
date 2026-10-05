@@ -1,11 +1,82 @@
-{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}Auditoria{% endblock %}{% block content %}<header class="page-heading">
-<div>
-<p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>Auditoria</h1>
-</div>
-<div class="actions">
-</div>
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf with context %}
+{% block title %}Auditoria{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">RASTREABILIDADE E SEGURANÇA</p>
+    <h1>Auditoria</h1>
+  </div>
+  <div class="actions">
+  </div>
 </header>
+
 <section class="panel">
-<p class="muted">Últimos 200 eventos registrados. Valores e correções preservam o histórico da operação.</p>{{ table(eventos,[('created_at','Data e hora'),('usuario_nome','Usuário'),('entidade','Entidade'),('entidade_id','Registro'),('acao','Ação'),('detalhes','Detalhes')]) }}</section>{% endblock %}
+  <div class="panel-heading">
+    <div>
+      <h2>Histórico de Operações</h2>
+      <p class="muted" style="margin: 4px 0 0; font-size: 13.5px;">
+        Últimos 200 eventos registrados. Valores e correções preservam o histórico completo das operações.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th scope="col" style="min-width: 140px;">Data e hora</th>
+          <th scope="col" style="min-width: 130px;">Responsável</th>
+          <th scope="col" style="min-width: 150px;">Origem / Registro</th>
+          <th scope="col" style="min-width: 110px;">Ação</th>
+          <th scope="col">O que foi realizado (Detalhes)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in eventos %}
+        {% set badge_info = ev.acao|acao_badge %}
+        {% set texto_humano = ev.detalhes|auditoria_humana(ev.entidade, ev.acao) %}
+        {% set json_tecnico = ev.detalhes|auditoria_raw %}
+        <tr>
+          <td class="audit-cell-datetime">
+            <strong>{{ ev.created_at|date_br }}</strong>
+            <small class="muted" style="display: block; font-size: 11.5px;">{{ ev.created_at|time_br }}</small>
+          </td>
+          <td class="audit-cell-user">
+            {% if ev.usuario_nome %}
+              <span class="audit-user-name">{{ ev.usuario_nome }}</span>
+            {% else %}
+              <span class="muted" title="Ação automática do sistema ou portal do cliente">Sistema / Portal</span>
+            {% endif %}
+          </td>
+          <td class="audit-cell-entity">
+            <span class="audit-entity-label">{{ ev.entidade|entidade_label }}</span>
+            {% if ev.entidade_id %}
+              <span class="audit-entity-id">#{{ ev.entidade_id }}</span>
+            {% endif %}
+          </td>
+          <td class="audit-cell-action">
+            <span class="badge {{ badge_info.class }}">{{ badge_info.label }}</span>
+          </td>
+          <td class="audit-cell-details">
+            <div class="audit-human-text">{{ texto_humano }}</div>
+            {% if json_tecnico %}
+            <details class="audit-tech-details">
+              <summary>Ver JSON técnico</summary>
+              <pre>{{ json_tecnico }}</pre>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">
+            <div class="empty">Nenhum evento de auditoria registrado até o momento.</div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

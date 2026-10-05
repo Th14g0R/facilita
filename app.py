@@ -351,10 +351,15 @@ def datas_titulo(registro, movimento=False):
 def register_template_filters(app: Flask) -> None:
     app.add_template_filter(format_money, "money")
     app.add_template_filter(format_date_br, "date_br")
+    app.add_template_filter(format_time_br, "time_br")
     app.add_template_filter(format_percent_br, "percent_br")
     app.add_template_filter(format_competencia_br, "competencia_br")
     app.add_template_filter(format_titulo_status, "titulo_status")
     app.add_template_filter(format_tipo_label, "tipo_label")
+    app.add_template_filter(format_entidade_label, "entidade_label")
+    app.add_template_filter(format_acao_badge, "acao_badge")
+    app.add_template_filter(format_auditoria_humana, "auditoria_humana")
+    app.add_template_filter(format_auditoria_raw, "auditoria_raw")
 
     def _acesso_status(val: str | None) -> str:
         return {
@@ -499,6 +504,254 @@ def format_percent_br(value: Any) -> str:
 
     text = format(decimal_value.normalize(), "f")
     return text.replace(".", ",") + "%"
+
+
+def format_time_br(value: Any) -> str:
+    """Extrai o horário formatado HH:MM:SS de um datetime ou string ISO/SQL."""
+    if value is None or value == "":
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%H:%M:%S")
+    text = str(value).strip()
+    m = re.search(r"(\d{2}):(\d{2}):(\d{2})", text)
+    if m:
+        return f"{m.group(1)}:{m.group(2)}:{m.group(3)}"
+    return ""
+
+
+def format_entidade_label(entidade: str | None) -> str:
+    """Retorna um nome legível e humano para a entidade auditada."""
+    mapping = {
+        "cliente_acesso": "Acesso ao Portal",
+        "pagamento_integrado": "Recebimento",
+        "titulo_receber": "Título a Receber",
+        "emprestimo": "Operação",
+        "movimentacao_emprestimo": "Movimentação",
+        "comprovante_pagamento": "Comprovante",
+        "cliente": "Cliente",
+        "usuario": "Usuário",
+        "conta_bancaria": "Conta Bancária",
+        "cartao_credito": "Cartão de Crédito",
+        "lancamento_cartao": "Lançamento Cartão",
+        "parcela_cartao": "Parcela Cartão",
+    }
+    clean = str(entidade or "").strip().lower()
+    return mapping.get(clean, clean.replace("_", " ").title() or "Geral")
+
+
+def format_acao_badge(acao: str | None) -> dict[str, str]:
+    """Retorna a classe visual e o rótulo amigável para uma ação de auditoria."""
+    act = str(acao or "").strip().upper()
+    if act in {"CRIADO", "CRIADA"}:
+        return {"class": "recebido", "label": "Criado"}
+    if act in {"RECEBIDO", "PAGA"}:
+        return {"class": "recebido", "label": "Recebido"}
+    if act in {"APROVADO", "ATIVADO", "ATIVADA", "CONFIRMADO_E_BAIXADO"}:
+        return {"class": "ativo", "label": "Aprovado"}
+    if act in {"ALTERADO", "ALTERADA", "ALTERADO_ADMIN", "EDITADA", "REAGENDADO", "VENCIMENTO_ALTERADO"}:
+        return {"class": "parcial", "label": "Alterado"}
+    if act in {"JUROS_LANCADOS"}:
+        return {"class": "parcial", "label": "Taxa Lançada"}
+    if act in {"SOLICITADO", "ENVIADO_PORTAL"}:
+        return {"class": "previsto", "label": "Solicitado"}
+    if act in {"REJEITADO"}:
+        return {"class": "vencido", "label": "Rejeitado"}
+    if act in {"EXCLUIDO", "EXCLUIDA", "CANCELADO"}:
+        return {"class": "vencido", "label": "Excluído"}
+    if act in {"INATIVADO", "INATIVADA"}:
+        return {"class": "vencido", "label": "Inativado"}
+    return {"class": "", "label": act.replace("_", " ").title()}
+
+
+def _comparar_antes_depois(antes: Any, depois: Any, motivo: str | None = None) -> str | None:
+    if not isinstance(antes, dict) or not isinstance(depois, dict):
+        return None
+    mudancas = []
+    ignorar = {"updated_at", "created_at", "id", "ajuste_manual", "movimentacao_id", "titulo_origem_id"}
+    nomes_amigaveis = {
+        "usuario": "Login de acesso",
+        "email": "E-mail",
+        "telefone_informado": "Telefone",
+        "status": "Situação",
+        "descricao": "Descrição",
+        "limite_centavos": "Limite do cartão",
+        "dia_fechamento": "Dia de fechamento",
+        "dia_vencimento": "Dia de vencimento",
+        "data_vencimento": "Data de vencimento",
+        "data_recebimento": "Data de recebimento",
+        "valor_previsto_centavos": "Valor previsto",
+        "valor_base_centavos": "Valor base",
+        "saldo_base_centavos": "Saldo base",
+        "taxa_juros_mensal": "Taxa mensal",
+        "banco": "Banco",
+        "chave_pix": "Chave PIX",
+        "ativo": "Status",
+        "observacao_admin": "Observação",
+    }
+
+    for k in list(depois.keys()) + [x for x in antes.keys() if x not in depois]:
+        if k in ignorar:
+            continue
+        v_ant = antes.get(k)
+        v_dep = depois.get(k)
+        if v_ant != v_dep:
+            label = nomes_amigaveis.get(k, k.replace("_", " ").capitalize())
+            def fmt_val(val: Any, chave: str) -> str:
+                if val is None or val == "":
+                    return "(vazio)"
+                if "centavos" in chave:
+                    return format_money(val)
+                if "data" in chave or "vencimento" in chave:
+                    return format_date_br(str(val))
+                if "competencia" in chave:
+                    return format_competencia_br(str(val))
+                if chave == "ativo":
+                    return "Ativo" if val else "Inativo"
+                return f"'{val}'"
+            mudancas.append(f"{label} alterado de {fmt_val(v_ant, k)} para {fmt_val(v_dep, k)}")
+
+    if not mudancas:
+        return None
+    res = "; ".join(mudancas) + "."
+    if motivo:
+        res += f" Motivo: {motivo}."
+    return res
+
+
+def humanizar_auditoria(detalhes: Any, entidade: str | None = None, acao: str | None = None) -> tuple[str, str | None]:
+    if not detalhes or not str(detalhes).strip() or str(detalhes).strip() == "None":
+        return "Nenhum detalhe adicional registrado.", None
+
+    raw_text = str(detalhes).strip()
+    data = None
+    try:
+        data = json.loads(raw_text)
+    except Exception:
+        pass
+
+    # Se não for JSON (texto simples)
+    if data is None or not isinstance(data, (dict, list)):
+        texto = raw_text
+        def sub_cents(m: re.Match[str]) -> str:
+            return format_money(int(m.group(1)))
+        texto = re.sub(r"(\d+)\s+centavos", sub_cents, texto)
+        def sub_comp(m: re.Match[str]) -> str:
+            return "Competência " + format_competencia_br(m.group(1))
+        texto = re.sub(r"Compet[êe]ncia\s+(\d{4}-\d{2})", sub_comp, texto, flags=re.IGNORECASE)
+        return texto, None
+
+    json_formatado = json.dumps(data, indent=2, ensure_ascii=False)
+
+    # Comparação antes e depois (cobre cliente_acesso, titulo_receber, cartao, etc.)
+    if isinstance(data, dict) and "antes" in data and "depois" in data:
+        res = _comparar_antes_depois(data.get("antes"), data.get("depois"), data.get("motivo"))
+        if data.get("senha_alterada"):
+            prefixo = "Senha de acesso redefinida pelo administrador. "
+            res = prefixo + (res or "")
+        if res:
+            return res, json_formatado
+
+    # Recebimento Integrado
+    if entidade == "pagamento_integrado" or ("itens" in data and "valor_total_centavos" in data):
+        itens = data.get("itens") or []
+        total_cents = data.get("valor_total_centavos", 0)
+        juros_atraso_cents = data.get("juros_atraso_centavos", 0)
+        nomes = list(dict.fromkeys(it.get("cliente_nome") for it in itens if it.get("cliente_nome")))
+        comps = list(dict.fromkeys(it.get("competencia") for it in itens if it.get("competencia")))
+        cliente_info = f" para {', '.join(nomes)}" if nomes else ""
+        comp_info = f" (Comp. {', '.join(format_competencia_br(c) for c in comps)})" if comps else ""
+        qtd = len(itens)
+        titulos_txt = f"{qtd} título{'s' if qtd != 1 else ''}"
+        res = f"Recebimento agrupado de {format_money(total_cents)}{cliente_info} referente a {titulos_txt}{comp_info}."
+        if juros_atraso_cents > 0:
+            res += f" (Inclui {format_money(juros_atraso_cents)} de compensação por atraso)."
+        return res, json_formatado
+
+    # Título a Receber
+    if entidade == "titulo_receber" and acao == "RECEBIDO":
+        valor = data.get("valor_total_centavos") or data.get("valor_recebido_centavos") or data.get("valor_base_centavos")
+        cliente = data.get("cliente_nome")
+        comp = data.get("competencia")
+        emp_id = data.get("emprestimo_id")
+        parts = ["Título recebido/baixado"]
+        if valor:
+            parts.append(f"no valor de {format_money(valor)}")
+        if cliente:
+            parts.append(f"do cliente {cliente}")
+        if comp:
+            parts.append(f"(Comp. {format_competencia_br(comp)})")
+        if emp_id:
+            parts.append(f"na Operação #{emp_id}")
+        return " ".join(parts) + ".", json_formatado
+
+    # Movimentação Excluída
+    if entidade == "movimentacao_emprestimo" and acao == "EXCLUIDA":
+        motivo = data.get("motivo")
+        reg = data.get("registro_excluido") or {}
+        tipo = reg.get("tipo", "movimentação")
+        val = reg.get("valor_centavos")
+        comp = reg.get("competencia")
+        res = f"Movimentação ({format_tipo_label(tipo)}) cancelada"
+        if val:
+            res += f" no valor de {format_money(val)}"
+        if comp:
+            res += f" referente à competência {format_competencia_br(comp)}"
+        res += "."
+        if motivo:
+            res += f" Motivo: '{motivo}'."
+        return res, json_formatado
+
+    # Comprovante de Pagamento
+    if entidade == "comprovante_pagamento":
+        if acao == "REJEITADO":
+            return f"Comprovante rejeitado pelo administrador. Motivo: '{data.get('motivo', 'Não informado')}'.", json_formatado
+        elif acao == "ENVIADO_PORTAL":
+            val = data.get("valor_total_centavos")
+            itens = data.get("itens") or []
+            return f"Comprovante enviado via portal no valor de {format_money(val)} ({len(itens)} título(s)).", json_formatado
+        elif acao == "CONFIRMADO_E_BAIXADO":
+            return "Comprovante aprovado e título(s) baixados com sucesso.", json_formatado
+
+    # Cliente Acesso
+    if entidade == "cliente_acesso":
+        if acao == "APROVADO":
+            return f"Acesso liberado para o e-mail '{data.get('email')}'.", json_formatado
+        elif acao == "SOLICITADO":
+            return "Solicitação de acesso cadastrada pelo cliente via portal.", json_formatado
+        elif acao == "REJEITADO":
+            return f"Solicitação de acesso rejeitada. Motivo: '{data.get('motivo', 'Não informado')}'.", json_formatado
+
+    # Dicionário genérico
+    if isinstance(data, dict):
+        itens_resumo = []
+        for k, v in data.items():
+            if v is None or v == "" or k in ["registro_excluido", "titulos_vinculados"]:
+                continue
+            label = k.replace("_", " ").capitalize()
+            if "centavos" in k:
+                label = label.replace(" centavos", "")
+                val_fmt = format_money(v)
+            elif "data" in k or "vencimento" in k:
+                val_fmt = format_date_br(str(v))
+            elif "competencia" in k:
+                val_fmt = format_competencia_br(str(v))
+            else:
+                val_fmt = str(v)
+            itens_resumo.append(f"{label}: {val_fmt}")
+        if itens_resumo:
+            return " • ".join(itens_resumo[:5]), json_formatado
+
+    return raw_text, json_formatado
+
+
+def format_auditoria_humana(detalhes: Any, entidade: str | None = None, acao: str | None = None) -> str:
+    texto, _ = humanizar_auditoria(detalhes, entidade, acao)
+    return texto
+
+
+def format_auditoria_raw(detalhes: Any) -> str | None:
+    _, raw = humanizar_auditoria(detalhes)
+    return raw
 
 
 def validate_cpf(cpf: str) -> bool:
