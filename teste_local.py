@@ -9,7 +9,8 @@ def main():
     parser.add_argument('--port', type=int, default=5001)
     args = parser.parse_args()
     local_data = Path(__file__).resolve().parent / 'data' / 'local-test'
-    # Não reutiliza caminhos de produção herdados do terminal.
+    # Não reutiliza caminhos ou banco de produção herdados do terminal ou do .env.
+    os.environ.pop('DATABASE_URL', None)
     os.environ['EMPRESTIMO_DATA_DIR'] = str(local_data)
     os.environ['EMPRESTIMO_DATABASE'] = str(local_data / 'emprestimos.db')
     os.environ['EMPRESTIMO_SECRET_KEY_FILE'] = str(local_data / '.secret_key')
