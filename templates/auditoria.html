@@ -8,15 +8,97 @@
     <h1>Auditoria</h1>
   </div>
   <div class="actions">
+    {% if filtros.q or filtros.data_inicio or filtros.data_fim or filtros.entidade or filtros.acao or filtros.usuario_id or filtros.per_page != 25 %}
+    <a href="{{ url_for('auditoria_lista') }}" class="button small">Limpar todos os filtros</a>
+    {% endif %}
   </div>
 </header>
 
+<!-- Painel de Busca e Filtros Avançados -->
+<section class="panel audit-filters-panel">
+  <form method="get" action="{{ url_for('auditoria_lista') }}" class="audit-filters-form">
+    <div class="audit-filters-grid">
+      <div class="field">
+        <span>Pesquisar</span>
+        <input type="text" name="q" value="{{ filtros.q }}" placeholder="Nome, detalhe, termo..." autocomplete="off">
+      </div>
+
+      <div class="field">
+        <span>Data inicial</span>
+        <input type="date" name="data_inicio" value="{{ filtros.data_inicio }}">
+      </div>
+
+      <div class="field">
+        <span>Data final</span>
+        <input type="date" name="data_fim" value="{{ filtros.data_fim }}">
+      </div>
+
+      <div class="field">
+        <span>Origem / Módulo</span>
+        <select name="entidade">
+          <option value="">Todas as origens</option>
+          {% for ent in entidades_lista %}
+          <option value="{{ ent }}" {% if filtros.entidade == ent %}selected{% endif %}>{{ ent|entidade_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <span>Tipo de Ação</span>
+        <select name="acao">
+          <option value="">Todas as ações</option>
+          {% for ac in acoes_lista %}
+          {% set b = ac|acao_badge %}
+          <option value="{{ ac }}" {% if filtros.acao == ac %}selected{% endif %}>{{ b.label }} ({{ ac }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <span>Responsável</span>
+        <select name="usuario_id">
+          <option value="">Todos</option>
+          <option value="sistema" {% if filtros.usuario_id == 'sistema' %}selected{% endif %}>Sistema / Portal</option>
+          {% for u in usuarios_lista %}
+          <option value="{{ u.id }}" {% if filtros.usuario_id|string == u.id|string %}selected{% endif %}>{{ u.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <span>Itens por página</span>
+        <select name="per_page">
+          {% for qtd in [20, 25, 40, 50, 60, 100, 200] %}
+          <option value="{{ qtd }}" {% if filtros.per_page == qtd %}selected{% endif %}>{{ qtd }} por página</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="audit-filters-actions">
+      <button type="submit" class="button primary">
+        <span>🔍 Filtrar</span>
+      </button>
+      {% if filtros.q or filtros.data_inicio or filtros.data_fim or filtros.entidade or filtros.acao or filtros.usuario_id or filtros.per_page != 25 %}
+      <a href="{{ url_for('auditoria_lista') }}" class="button">
+        Limpar
+      </a>
+      {% endif %}
+    </div>
+  </form>
+</section>
+
+<!-- Listagem e Resultados -->
 <section class="panel">
   <div class="panel-heading">
     <div>
       <h2>Histórico de Operações</h2>
       <p class="muted" style="margin: 4px 0 0; font-size: 13.5px;">
-        Últimos 200 eventos registrados. Valores e correções preservam o histórico completo das operações.
+        {% if total_registros > 0 %}
+          Mostrando <strong>{{ item_inicio }}–{{ item_fim }}</strong> de <strong>{{ total_registros }}</strong> evento(s) encontrado(s).
+        {% else %}
+          Nenhum evento encontrado com os filtros selecionados.
+        {% endif %}
       </p>
     </div>
   </div>
@@ -71,12 +153,69 @@
         {% else %}
         <tr>
           <td colspan="5">
-            <div class="empty">Nenhum evento de auditoria registrado até o momento.</div>
+            <div class="empty">
+              <p style="margin-bottom: 8px; font-weight: 600;">Nenhum evento encontrado.</p>
+              <span class="muted" style="font-size: 13px;">Tente ajustar ou limpar os filtros de busca.</span>
+            </div>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
+  <!-- Controles de Paginação -->
+  {% if total_paginas > 1 %}
+  <div class="audit-pagination">
+    <div class="pagination-info muted">
+      Página <strong>{{ page }}</strong> de <strong>{{ total_paginas }}</strong> ({{ total_registros }} registros no total)
+    </div>
+
+    <div class="pagination-buttons">
+      {% if page > 1 %}
+      <a href="{{ url_for('auditoria_lista', page=page-1, per_page=filtros.per_page, q=filtros.q, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim, entidade=filtros.entidade, acao=filtros.acao, usuario_id=filtros.usuario_id) }}" class="button small">
+        ← Anterior
+      </a>
+      {% else %}
+      <span class="button small disabled" aria-disabled="true" style="opacity: 0.5; pointer-events: none;">
+        ← Anterior
+      </span>
+      {% endif %}
+
+      <div class="pagination-pages">
+        {% set start_page = [1, page - 2]|max %}
+        {% set end_page = [total_paginas, page + 2]|min %}
+
+        {% if start_page > 1 %}
+        <a href="{{ url_for('auditoria_lista', page=1, per_page=filtros.per_page, q=filtros.q, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim, entidade=filtros.entidade, acao=filtros.acao, usuario_id=filtros.usuario_id) }}" class="button small page-num">1</a>
+        {% if start_page > 2 %}<span class="pagination-ellipsis">…</span>{% endif %}
+        {% endif %}
+
+        {% for p in range(start_page, end_page + 1) %}
+        {% if p == page %}
+        <span class="button small primary page-num active" aria-current="page">{{ p }}</span>
+        {% else %}
+        <a href="{{ url_for('auditoria_lista', page=p, per_page=filtros.per_page, q=filtros.q, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim, entidade=filtros.entidade, acao=filtros.acao, usuario_id=filtros.usuario_id) }}" class="button small page-num">{{ p }}</a>
+        {% endif %}
+        {% endfor %}
+
+        {% if end_page < total_paginas %}
+        {% if end_page < total_paginas - 1 %}<span class="pagination-ellipsis">…</span>{% endif %}
+        <a href="{{ url_for('auditoria_lista', page=total_paginas, per_page=filtros.per_page, q=filtros.q, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim, entidade=filtros.entidade, acao=filtros.acao, usuario_id=filtros.usuario_id) }}" class="button small page-num">{{ total_paginas }}</a>
+        {% endif %}
+      </div>
+
+      {% if page < total_paginas %}
+      <a href="{{ url_for('auditoria_lista', page=page+1, per_page=filtros.per_page, q=filtros.q, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim, entidade=filtros.entidade, acao=filtros.acao, usuario_id=filtros.usuario_id) }}" class="button small">
+        Próxima →
+      </a>
+      {% else %}
+      <span class="button small disabled" aria-disabled="true" style="opacity: 0.5; pointer-events: none;">
+        Próxima →
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </section>
 {% endblock %}

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.0+build.1 — 2026-10-05
+
+- Transição completa para a identidade visual Facilita e redesign moderno (paleta inspirada em Conta Azul e Asaas com temas Claro e Escuro refinados).
+- Página de Auditoria com filtros avançados: período (data inicial e final), tipo de ação, responsável, módulo/origem e pesquisa textual em tempo real.
+- Paginação dinâmica na Auditoria com seletor de limite por página (20, 25, 40, 50, 60, 100, 200 itens) e navegação completa entre páginas.
+- Humanização detalhada dos registros de auditoria em linguagem natural e amigável.
+- Recursos avançados de compensação: abono integral, recálculo e desconto proporcional em recebimentos.
+- Deploy em produção 24/7 na Vercel Serverless com PostgreSQL Supabase e segurança multicamadas.
+
 ## 2.1.1+build.3 — 2026-09-20
 
 - Caminho padrão macOS corrigido para ~/Applications.

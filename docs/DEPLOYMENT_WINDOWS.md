@@ -1,6 +1,6 @@
 # Instalação e atualização da versão 2 no Windows
 
-Versão 2.1.1+build.3, branch `release/v2`, serviço `Emprestimo`.
+Versão 2.2.0+build.1, branch `main`, serviço `Facilita`.
 O gerenciador e o bootstrap desta branch usam `release/v2`, sem publicar ou
 incorporar mudanças na `main`.
 

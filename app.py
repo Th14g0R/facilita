@@ -1774,10 +1774,136 @@ def register_routes(app: Flask) -> None:
     @app.get("/auditoria")
     @login_required
     def auditoria_lista():
-        eventos = get_db().execute("""SELECT a.*, u.nome AS usuario_nome
-            FROM auditoria a LEFT JOIN usuarios u ON u.id=a.usuario_id
-            ORDER BY a.id DESC LIMIT 200""").fetchall()
-        return render_template("auditoria.html", eventos=eventos)
+        import math
+        db = get_db()
+
+        # Parâmetros de filtro e busca
+        q = (request.args.get("q") or "").strip()
+        data_inicio = (request.args.get("data_inicio") or "").strip()
+        data_fim = (request.args.get("data_fim") or "").strip()
+        entidade_filtro = (request.args.get("entidade") or "").strip()
+        acao_filtro = (request.args.get("acao") or "").strip()
+        usuario_id_filtro = (request.args.get("usuario_id") or "").strip()
+
+        # Quantidade por página selecionável (padrão 25)
+        try:
+            per_page = int(request.args.get("per_page", 25))
+            if per_page not in {20, 25, 40, 50, 60, 100, 200}:
+                per_page = 25
+        except (ValueError, TypeError):
+            per_page = 25
+
+        try:
+            page = max(1, int(request.args.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
+
+        # Construção dinâmica da query
+        where_clauses = []
+        params = []
+
+        if q:
+            where_clauses.append(
+                "(LOWER(a.detalhes) LIKE ? OR LOWER(a.entidade) LIKE ? OR LOWER(a.acao) LIKE ? OR LOWER(COALESCE(u.nome, '')) LIKE ?)"
+            )
+            q_like = f"%{q.lower()}%"
+            params.extend([q_like, q_like, q_like, q_like])
+
+        if data_inicio:
+            where_clauses.append("a.created_at >= ?")
+            params.append(f"{data_inicio} 00:00:00")
+
+        if data_fim:
+            where_clauses.append("a.created_at <= ?")
+            params.append(f"{data_fim} 23:59:59")
+
+        if entidade_filtro:
+            where_clauses.append("a.entidade = ?")
+            params.append(entidade_filtro)
+
+        if acao_filtro:
+            where_clauses.append("a.acao = ?")
+            params.append(acao_filtro)
+
+        if usuario_id_filtro:
+            if usuario_id_filtro == "sistema":
+                where_clauses.append("a.usuario_id IS NULL")
+            elif usuario_id_filtro.isdigit():
+                where_clauses.append("a.usuario_id = ?")
+                params.append(int(usuario_id_filtro))
+
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        # Contagem total para paginação
+        count_sql = f"""
+            SELECT COUNT(*) AS total
+            FROM auditoria a
+            LEFT JOIN usuarios u ON u.id = a.usuario_id
+            {where_sql}
+        """
+        total_row = db.execute(count_sql, params).fetchone()
+        total_registros = int(total_row["total"] if total_row else 0)
+
+        # Cálculo de paginação
+        total_paginas = max(1, math.ceil(total_registros / per_page)) if total_registros > 0 else 1
+        if page > total_paginas:
+            page = total_paginas
+        offset = (page - 1) * per_page
+
+        # Registros paginados
+        select_sql = f"""
+            SELECT a.*, u.nome AS usuario_nome
+            FROM auditoria a
+            LEFT JOIN usuarios u ON u.id = a.usuario_id
+            {where_sql}
+            ORDER BY a.id DESC
+            LIMIT ? OFFSET ?
+        """
+        eventos = db.execute(select_sql, params + [per_page, offset]).fetchall()
+
+        # Dados para preenchimento dos filtros
+        usuarios_lista = db.execute("SELECT id, nome FROM usuarios ORDER BY nome").fetchall()
+        entidades_lista = [
+            r["entidade"]
+            for r in db.execute(
+                "SELECT DISTINCT entidade FROM auditoria WHERE entidade IS NOT NULL ORDER BY entidade"
+            ).fetchall()
+        ]
+        acoes_lista = [
+            r["acao"]
+            for r in db.execute(
+                "SELECT DISTINCT acao FROM auditoria WHERE acao IS NOT NULL ORDER BY acao"
+            ).fetchall()
+        ]
+
+        item_inicio = offset + 1 if total_registros > 0 else 0
+        item_fim = min(offset + per_page, total_registros)
+
+        filtros = {
+            "q": q,
+            "data_inicio": data_inicio,
+            "data_fim": data_fim,
+            "entidade": entidade_filtro,
+            "acao": acao_filtro,
+            "usuario_id": usuario_id_filtro,
+            "per_page": per_page,
+            "page": page,
+        }
+
+        return render_template(
+            "auditoria.html",
+            eventos=eventos,
+            filtros=filtros,
+            total_registros=total_registros,
+            total_paginas=total_paginas,
+            page=page,
+            per_page=per_page,
+            item_inicio=item_inicio,
+            item_fim=item_fim,
+            usuarios_lista=usuarios_lista,
+            entidades_lista=entidades_lista,
+            acoes_lista=acoes_lista,
+        )
 
     if app.debug or env_bool("EMPRESTIMO_DEBUG", False):
         @app.get("/debug/tabelas")
