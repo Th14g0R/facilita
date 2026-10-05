@@ -198,10 +198,68 @@ function protectMonetaryTextNodes() {
   });
 }
 
-// Inicializa o tema e o modo de privacidade quando o DOM estiver pronto
+// ============================================================================
+// Controle de Exibição / Recolhimento da Barra Lateral (Sidebar)
+// ============================================================================
+const SIDEBAR_STORAGE_KEY = 'facilita_sidebar_collapsed';
+
+function isSidebarCollapsed() {
+  return document.documentElement.getAttribute('data-sidebar-collapsed') === 'true';
+}
+
+function setSidebarCollapsed(collapsed) {
+  try {
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed ? 'true' : 'false');
+  } catch (e) {}
+
+  if (collapsed) {
+    document.documentElement.setAttribute('data-sidebar-collapsed', 'true');
+  } else {
+    document.documentElement.removeAttribute('data-sidebar-collapsed');
+  }
+
+  updateSidebarToggleButtons(collapsed);
+}
+
+function updateSidebarToggleButtons(collapsed) {
+  const btnSidebar = document.getElementById('btnSidebarToggle');
+  const btnTopbar = document.getElementById('btnTopbarSidebarToggle');
+
+  if (btnSidebar) {
+    btnSidebar.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    btnSidebar.setAttribute('title', collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral');
+  }
+  if (btnTopbar) {
+    btnTopbar.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    btnTopbar.setAttribute('title', collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral');
+  }
+}
+
+function initSidebarToggle() {
+  const isCollapsed = isSidebarCollapsed();
+  updateSidebarToggleButtons(isCollapsed);
+
+  const toggleHandler = () => {
+    const nextState = !isSidebarCollapsed();
+    setSidebarCollapsed(nextState);
+  };
+
+  const btnSidebar = document.getElementById('btnSidebarToggle');
+  if (btnSidebar) {
+    btnSidebar.addEventListener('click', toggleHandler);
+  }
+
+  const btnTopbar = document.getElementById('btnTopbarSidebarToggle');
+  if (btnTopbar) {
+    btnTopbar.addEventListener('click', toggleHandler);
+  }
+}
+
+// Inicializa o tema, o modo de privacidade e o menu lateral quando o DOM estiver pronto
 function initApp() {
   initTheme();
   initPrivacyMode();
+  initSidebarToggle();
 }
 
 if (document.readyState === 'loading') {

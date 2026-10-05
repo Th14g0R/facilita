@@ -7,57 +7,48 @@
     <p class="eyebrow">RASTREABILIDADE E SEGURANÇA</p>
     <h1>Auditoria</h1>
   </div>
-  <div class="actions">
-    {% if filtros.q or filtros.data_inicio or filtros.data_fim or filtros.entidade or filtros.acao or filtros.usuario_id or filtros.per_page != 25 %}
-    <a href="{{ url_for('auditoria_lista') }}" class="button small">Limpar todos os filtros</a>
-    {% endif %}
-  </div>
 </header>
 
-<!-- Painel de Busca e Filtros Avançados -->
+<!-- Painel de Filtros em Linha com Ícones -->
 <section class="panel audit-filters-panel">
-  <form method="get" action="{{ url_for('auditoria_lista') }}" class="audit-filters-form">
-    <div class="audit-filters-grid">
-      <div class="field">
-        <span>Pesquisar</span>
-        <input type="text" name="q" value="{{ filtros.q }}" placeholder="Nome, detalhe, termo..." autocomplete="off">
+  <form method="get" action="{{ url_for('auditoria_lista') }}" class="audit-filters-inline-form">
+    <input type="hidden" name="per_page" value="{{ filtros.per_page }}">
+    
+    <div class="audit-filters-row">
+      <div class="filter-field filter-search">
+        <input type="text" name="q" value="{{ filtros.q }}" placeholder="Pesquisar termo, detalhe..." autocomplete="off">
       </div>
 
-      <div class="field">
-        <span>Data inicial</span>
-        <input type="date" name="data_inicio" value="{{ filtros.data_inicio }}">
+      <div class="filter-field filter-date" title="Data inicial">
+        <input type="date" name="data_inicio" value="{{ filtros.data_inicio }}" aria-label="Data inicial">
       </div>
 
-      <div class="field">
-        <span>Data final</span>
-        <input type="date" name="data_fim" value="{{ filtros.data_fim }}">
+      <div class="filter-field filter-date" title="Data final">
+        <input type="date" name="data_fim" value="{{ filtros.data_fim }}" aria-label="Data final">
       </div>
 
-      <div class="field">
-        <span>Origem / Módulo</span>
-        <select name="entidade">
-          <option value="">Todas as origens</option>
+      <div class="filter-field filter-select">
+        <select name="entidade" aria-label="Origem ou módulo">
+          <option value="">Origem (todas)</option>
           {% for ent in entidades_lista %}
           <option value="{{ ent }}" {% if filtros.entidade == ent %}selected{% endif %}>{{ ent|entidade_label }}</option>
           {% endfor %}
         </select>
       </div>
 
-      <div class="field">
-        <span>Tipo de Ação</span>
-        <select name="acao">
-          <option value="">Todas as ações</option>
+      <div class="filter-field filter-select">
+        <select name="acao" aria-label="Tipo de ação">
+          <option value="">Ação (todas)</option>
           {% for ac in acoes_lista %}
           {% set b = ac|acao_badge %}
-          <option value="{{ ac }}" {% if filtros.acao == ac %}selected{% endif %}>{{ b.label }} ({{ ac }})</option>
+          <option value="{{ ac }}" {% if filtros.acao == ac %}selected{% endif %}>{{ b.label }}</option>
           {% endfor %}
         </select>
       </div>
 
-      <div class="field">
-        <span>Responsável</span>
-        <select name="usuario_id">
-          <option value="">Todos</option>
+      <div class="filter-field filter-select">
+        <select name="usuario_id" aria-label="Responsável">
+          <option value="">Responsável (todos)</option>
           <option value="sistema" {% if filtros.usuario_id == 'sistema' %}selected{% endif %}>Sistema / Portal</option>
           {% for u in usuarios_lista %}
           <option value="{{ u.id }}" {% if filtros.usuario_id|string == u.id|string %}selected{% endif %}>{{ u.nome }}</option>
@@ -65,25 +56,25 @@
         </select>
       </div>
 
-      <div class="field">
-        <span>Itens por página</span>
-        <select name="per_page">
-          {% for qtd in [20, 25, 40, 50, 60, 100, 200] %}
-          <option value="{{ qtd }}" {% if filtros.per_page == qtd %}selected{% endif %}>{{ qtd }} por página</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
+      <!-- Botões com Ícones: Lupa e Pincel de Limpeza -->
+      <div class="filter-actions-inline">
+        <button type="submit" class="button primary btn-filter-icon" title="Filtrar auditoria" aria-label="Filtrar">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
 
-    <div class="audit-filters-actions">
-      <button type="submit" class="button primary">
-        <span>🔍 Filtrar</span>
-      </button>
-      {% if filtros.q or filtros.data_inicio or filtros.data_fim or filtros.entidade or filtros.acao or filtros.usuario_id or filtros.per_page != 25 %}
-      <a href="{{ url_for('auditoria_lista') }}" class="button">
-        Limpar
-      </a>
-      {% endif %}
+        {% if filtros.q or filtros.data_inicio or filtros.data_fim or filtros.entidade or filtros.acao or filtros.usuario_id %}
+        <a href="{{ url_for('auditoria_lista', per_page=filtros.per_page) }}" class="button secondary btn-filter-icon btn-clean-filter" title="Limpar todos os filtros" aria-label="Limpar filtros">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 6.99l9.02 9.02 1.58-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"></path>
+            <path d="M9 8c-3 3-4 7-4 7l3 3s4-1 7-4"></path>
+            <line x1="14.5" y1="17.5" x2="4.5" y2="7.5"></line>
+          </svg>
+        </a>
+        {% endif %}
+      </div>
     </div>
   </form>
 </section>
@@ -107,10 +98,10 @@
     <table class="audit-table">
       <thead>
         <tr>
-          <th scope="col" style="min-width: 140px;">Data e hora</th>
-          <th scope="col" style="min-width: 130px;">Responsável</th>
-          <th scope="col" style="min-width: 150px;">Origem / Registro</th>
-          <th scope="col" style="min-width: 110px;">Ação</th>
+          <th scope="col" style="min-width: 145px; width: 15%;">Data e hora</th>
+          <th scope="col" style="min-width: 130px; width: 14%;">Responsável</th>
+          <th scope="col" style="min-width: 150px; width: 16%;">Origem / Registro</th>
+          <th scope="col" style="min-width: 110px; width: 12%;">Ação</th>
           <th scope="col">O que foi realizado (Detalhes)</th>
         </tr>
       </thead>
@@ -164,13 +155,28 @@
     </table>
   </div>
 
-  <!-- Controles de Paginação -->
-  {% if total_paginas > 1 %}
+  <!-- Rodapé Unificado na Mesma Linha: Itens por Página + Indicador + Navegação -->
+  {% if total_registros > 0 %}
   <div class="audit-pagination">
-    <div class="pagination-info muted">
-      Página <strong>{{ page }}</strong> de <strong>{{ total_paginas }}</strong> ({{ total_registros }} registros no total)
+    <!-- Seletor de Itens por Página Compacto -->
+    <div class="pagination-per-page">
+      <span class="muted pagination-label">Exibir:</span>
+      <select id="selectPerPage" onchange="window.location.href=this.value" class="select-per-page" aria-label="Quantidade de itens por página">
+        {% for qtd in [20, 25, 40, 50, 60, 100, 200] %}
+        <option value="{{ url_for('auditoria_lista', page=1, per_page=qtd, q=filtros.q, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim, entidade=filtros.entidade, acao=filtros.acao, usuario_id=filtros.usuario_id) }}" {% if filtros.per_page == qtd %}selected{% endif %}>
+          {{ qtd }}
+        </option>
+        {% endfor %}
+      </select>
     </div>
 
+    <!-- Indicador de Página e Registros -->
+    <div class="pagination-info muted">
+      Página <strong>{{ page }}</strong> de <strong>{{ total_paginas }}</strong> ({{ total_registros }} registros)
+    </div>
+
+    <!-- Botões de Navegação -->
+    {% if total_paginas > 1 %}
     <div class="pagination-buttons">
       {% if page > 1 %}
       <a href="{{ url_for('auditoria_lista', page=page-1, per_page=filtros.per_page, q=filtros.q, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim, entidade=filtros.entidade, acao=filtros.acao, usuario_id=filtros.usuario_id) }}" class="button small">
@@ -215,6 +221,7 @@
       </span>
       {% endif %}
     </div>
+    {% endif %}
   </div>
   {% endif %}
 </section>

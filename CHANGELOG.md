@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.3.0 — 2026-10-05
+
+- Novo gerenciamento de perfil: páginas dedicadas e seguras `/perfil` (Administrador) e `/portal/perfil` (Cliente), permitindo edição de dados cadastrais e alteração de senha de acesso com confirmação da senha atual.
+- Barra lateral retrátil (Sidebar): inclusão de botão hambúrguer no menu e na barra superior permitindo recolher ou expandir a navegação com persistência em `localStorage`.
+- Topbar minimalista: alternador de tema e botão de privacidade operando exclusivamente com ícones visuais modernos e acessíveis.
+- Rodapé da sidebar refinado: substituição de link de texto por botão estilizado de Desconexão e ícone de engrenagem para acesso direto ao perfil do usuário/cliente.
+- Auditoria com filtros em linha única: botões de ação substituídos por ícones (lupa para filtrar e pincel para limpar filtros).
+- Rodapé de auditoria unificado na mesma linha: seletor compacto de quantidade de registros por página posicionado junto à paginação e indicador de total de itens.
+
 ## 2.2.1+build.1 — 2026-10-05
 
 - Padronização estrita de data e hora no fuso horário oficial de Fortaleza/CE/Brasil (`America/Fortaleza`, UTC-3) em toda a aplicação.

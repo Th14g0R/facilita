@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf with context %}
+{% block title %}Meu Perfil{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">ÁREA DO CLIENTE</p>
+    <h1>Meu Perfil</h1>
+  </div>
+</header>
+
+<div class="panel" style="max-width: 580px;">
+  <h2>Meus Dados de Acesso</h2>
+  <p class="muted" style="margin-bottom: 20px;">Confira suas informações cadastrais e gerencie sua senha de acesso ao portal.</p>
+
+  <form method="post" action="{{ url_for('portal.perfil') }}">
+    {{ csrf() }}
+    
+    <label class="field">
+      <span>Nome</span>
+      <input type="text" value="{{ cliente.nome }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+    </label>
+
+    <label class="field">
+      <span>CPF</span>
+      <input type="text" value="{{ cliente.cpf }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+    </label>
+
+    <label class="field">
+      <span>E-mail cadastrado</span>
+      <input type="email" value="{{ acesso.email or '—' }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+    </label>
+
+    <label class="field">
+      <span>Telefone</span>
+      <input type="text" value="{{ acesso.telefone_informado or cliente.telefone or '—' }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+    </label>
+
+    <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+
+    <h3 style="font-size: 16px; margin-bottom: 12px;">Alterar Senha do Portal</h3>
+    <p class="muted" style="font-size: 13px; margin-bottom: 16px;">Para alterar sua senha, preencha os campos abaixo e informe sua senha atual.</p>
+
+    <label class="field">
+      <span>Nova senha</span>
+      <input type="password" name="nova_senha" autocomplete="new-password" placeholder="Mínimo de 6 caracteres">
+    </label>
+
+    <label class="field">
+      <span>Confirmar nova senha</span>
+      <input type="password" name="confirmacao_senha" autocomplete="new-password" placeholder="Repita a nova senha">
+    </label>
+
+    <div style="background: var(--surface-hover); padding: 14px 16px; border-radius: var(--radius); margin: 20px 0 24px; border: 1px solid var(--border);">
+      <label class="field" style="margin-bottom: 0;">
+        <span style="font-weight: 600; color: var(--text);">Confirmação: Sua senha atual</span>
+        <input type="password" name="senha_atual" autocomplete="current-password" placeholder="Digite sua senha atual caso vá alterar">
+      </label>
+    </div>
+
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <button type="submit" class="button primary">Salvar senha</button>
+      <a href="{{ url_for('portal.dashboard') }}" class="button">Voltar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

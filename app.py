@@ -2035,6 +2035,57 @@ def register_routes(app: Flask) -> None:
         flash("Sessão encerrada.", "success")
         return redirect(url_for("login"))
 
+    @app.route("/perfil", methods=["GET", "POST"])
+    @login_required
+    def perfil():
+        db = get_db()
+        usuario = db.execute("SELECT * FROM usuarios WHERE id = ?", (g.usuario["id"],)).fetchone()
+        if usuario is None:
+            abort(404)
+
+        form = {
+            "nome": usuario["nome"],
+            "login": usuario["login"],
+        }
+
+        if request.method == "POST":
+            nome = request.form.get("nome", "").strip()
+            senha_atual = request.form.get("senha_atual", "")
+            nova_senha = request.form.get("nova_senha", "")
+            confirmacao_senha = request.form.get("confirmacao_senha", "")
+            errors = []
+
+            if not check_password_hash(usuario["senha_hash"], senha_atual):
+                errors.append("Senha atual incorreta. Informe sua senha atual para autorizar as alterações.")
+            if not nome:
+                errors.append("O nome não pode ficar em branco.")
+
+            if nova_senha:
+                if len(nova_senha) < 6:
+                    errors.append("A nova senha deve possuir pelo menos 6 caracteres.")
+                elif nova_senha != confirmacao_senha:
+                    errors.append("A confirmação da nova senha não confere.")
+
+            if errors:
+                for err in errors:
+                    flash(err, "danger")
+            else:
+                novo_hash = generate_password_hash(nova_senha) if nova_senha else usuario["senha_hash"]
+                db.execute(
+                    """
+                    UPDATE usuarios
+                       SET nome = ?, senha_hash = ?, updated_at = CURRENT_TIMESTAMP
+                     WHERE id = ?
+                    """,
+                    (nome, novo_hash, usuario["id"]),
+                )
+                registrar_auditoria(db, "usuario", usuario["id"], "ATUALIZADO", f"Perfil do usuário atualizado: {nome}")
+                db.commit()
+                flash("Perfil atualizado com sucesso.", "success")
+                return redirect(url_for("perfil"))
+
+        return render_template("perfil.html", usuario=usuario, form=form)
+
     @app.get("/")
     @login_required
     def index():

@@ -543,6 +543,50 @@ def login():
 def logout(): session.pop('cliente_acesso_id',None); flash('Sessão encerrada.','success'); return redirect(url_for('portal.login'))
 
 
+@bp.route('/portal/perfil', methods=['GET', 'POST'])
+@portal_required
+def perfil():
+    db = get_db()
+    cid = int(g.portal_access['cliente_id'])
+    aid = int(g.portal_access['id'])
+    cliente = db.execute("SELECT * FROM clientes WHERE id = ?", (cid,)).fetchone()
+    acesso = db.execute("SELECT * FROM clientes_acessos WHERE id = ?", (aid,)).fetchone()
+    if cliente is None or acesso is None:
+        abort(404)
+
+    if request.method == 'POST':
+        senha_atual = request.form.get('senha_atual', '')
+        nova_senha = request.form.get('nova_senha', '')
+        confirmacao_senha = request.form.get('confirmacao_senha', '')
+        errors = []
+
+        if nova_senha:
+            if not check_password_hash(acesso['senha_hash'], senha_atual):
+                errors.append('Senha atual incorreta. Digite sua senha atual para alterar.')
+            elif len(nova_senha) < 6:
+                errors.append('A nova senha deve possuir pelo menos 6 caracteres.')
+            elif nova_senha != confirmacao_senha:
+                errors.append('A confirmação da nova senha não confere.')
+
+        if errors:
+            for err in errors:
+                flash(err, 'danger')
+        else:
+            if nova_senha:
+                novo_hash = generate_password_hash(nova_senha)
+                db.execute(
+                    "UPDATE clientes_acessos SET senha_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (novo_hash, aid),
+                )
+                registrar_auditoria(db, 'cliente_acesso', aid, 'SENHA_ALTERADA', 'Cliente alterou senha pelo portal.')
+                db.commit()
+                flash('Senha de acesso atualizada com sucesso.', 'success')
+            return redirect(url_for('portal.perfil'))
+
+    return render_template('portal/perfil.html', cliente=cliente, acesso=acesso)
+
+
+
 @bp.get('/portal')
 @portal_required
 def dashboard():

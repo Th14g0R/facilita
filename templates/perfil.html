@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf with context %}
+{% block title %}Meu Perfil{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">CONFIGURAÇÕES DE CONTA</p>
+    <h1>Meu Perfil</h1>
+  </div>
+</header>
+
+<div class="panel" style="max-width: 580px;">
+  <h2>Dados do Usuário</h2>
+  <p class="muted" style="margin-bottom: 20px;">Atualize suas informações de identificação ou altere sua senha de acesso.</p>
+
+  <form method="post" action="{{ url_for('perfil') }}">
+    {{ csrf() }}
+    
+    <label class="field">
+      <span>Nome completo</span>
+      <input type="text" name="nome" value="{{ form.nome }}" required autocomplete="name">
+    </label>
+
+    <label class="field">
+      <span>Nome de usuário (Login)</span>
+      <input type="text" value="{{ form.login }}" disabled style="opacity: 0.7; cursor: not-allowed;" title="O login é fixo e definido na criação">
+      <small class="muted" style="font-size: 12px; margin-top: 4px;">Identificador de acesso do sistema.</small>
+    </label>
+
+    <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+
+    <h3 style="font-size: 16px; margin-bottom: 12px;">Alterar Senha</h3>
+    <p class="muted" style="font-size: 13px; margin-bottom: 16px;">Deixe os campos de nova senha vazios caso queira manter a senha atual.</p>
+
+    <label class="field">
+      <span>Nova senha</span>
+      <input type="password" name="nova_senha" autocomplete="new-password" placeholder="Mínimo de 6 caracteres">
+    </label>
+
+    <label class="field">
+      <span>Confirmar nova senha</span>
+      <input type="password" name="confirmacao_senha" autocomplete="new-password" placeholder="Repita a nova senha">
+    </label>
+
+    <div style="background: var(--surface-hover); padding: 14px 16px; border-radius: var(--radius); margin: 20px 0 24px; border: 1px solid var(--border);">
+      <label class="field" style="margin-bottom: 0;">
+        <span style="font-weight: 600; color: var(--text);">Confirmação: Sua senha atual *</span>
+        <input type="password" name="senha_atual" required autocomplete="current-password" placeholder="Digite sua senha atual para autorizar as alterações">
+      </label>
+    </div>
+
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <button type="submit" class="button primary">Salvar alterações</button>
+      <a href="{{ url_for('dashboard') }}" class="button">Voltar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
