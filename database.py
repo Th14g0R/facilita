@@ -21,8 +21,41 @@ def get_database_url() -> str | None:
     return os.environ.get("DATABASE_URL") or current_app.config.get("DATABASE_URL")
 
 def is_postgres() -> bool:
+    # Se EMPRESTIMO_DATABASE foi fornecido explicitamente, prioriza o SQLite indicado
+    if os.environ.get("EMPRESTIMO_DATABASE"):
+        return False
     url = get_database_url()
     return bool(url and (url.startswith("postgresql://") or url.startswith("postgres://")))
+
+def safe_replace_placeholders(sql: str) -> str:
+    """Substitui ? por %s ignorando ocorrencias dentro de literais entre aspas simples."""
+    if "?" not in sql:
+        return sql
+    out = []
+    in_quote = False
+    for ch in sql:
+        if ch == "'":
+            in_quote = not in_quote
+            out.append(ch)
+        elif ch == "?" and not in_quote:
+            out.append("%s")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+_pg_pool = None
+
+def get_pg_pool(uri: str):
+    global _pg_pool
+    if _pg_pool is None and psycopg2:
+        import psycopg2.pool
+        if uri.startswith("postgres://"):
+            uri = "postgresql://" + uri[len("postgres://"):]
+        max_conn = int(os.environ.get("PG_MAX_CONNECTIONS", "8"))
+        _pg_pool = psycopg2.pool.ThreadedConnectionPool(1, max_conn, uri)
+    return _pg_pool
+
 
 class PostgresCursorWrapper:
     def __init__(self, cur):
@@ -48,7 +81,7 @@ class PostgresCursorWrapper:
         is_insert = upper.startswith("INSERT INTO")
         has_returning = "RETURNING" in upper
 
-        converted_sql = sql.replace("?", "%s")
+        converted_sql = safe_replace_placeholders(sql)
         # Remove COLLATE NOCASE em PostgreSQL para evitar dependencia de collation
         if "COLLATE NOCASE" in converted_sql.upper():
             converted_sql = re.sub(r"\s+COLLATE\s+NOCASE", "", converted_sql, flags=re.IGNORECASE)
@@ -106,13 +139,26 @@ class PostgresCursorWrapper:
         return iter(self.cur)
 
 class PostgresConnection:
-    def __init__(self, uri: str):
+    def __init__(self, uri: str, pool=None):
         if not psycopg2:
             raise RuntimeError("psycopg2-binary é necessário para conexões PostgreSQL.")
-        # Tratamento de prefixo postgres:// para postgresql:// se necessário
         if uri.startswith("postgres://"):
             uri = "postgresql://" + uri[len("postgres://"):]
-        self._conn = psycopg2.connect(uri)
+        self._uri = uri
+        self._pool = pool
+        self._conn = None
+        if self._pool:
+            try:
+                self._conn = self._pool.getconn()
+                if self._conn.closed:
+                    self._conn = psycopg2.connect(uri)
+                else:
+                    self._conn.rollback()
+            except Exception:
+                self._conn = psycopg2.connect(uri)
+                self._pool = None
+        else:
+            self._conn = psycopg2.connect(uri)
         self.defer_commit = False
 
     def cursor(self):
@@ -130,7 +176,23 @@ class PostgresConnection:
         self._conn.rollback()
 
     def close(self):
-        self._conn.close()
+        if self._pool and self._conn:
+            try:
+                if not self._conn.closed:
+                    self._conn.rollback()
+                self._pool.putconn(self._conn)
+            except Exception:
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+            self._conn = None
+        elif self._conn:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
 
     def executescript(self, script: str):
         pass
@@ -142,6 +204,45 @@ class PostgresConnection:
 
 
 _pg_migrated = False
+
+PG_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_clientes_nome ON clientes(nome);",
+    "CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf);",
+    "CREATE INDEX IF NOT EXISTS idx_contas_cliente ON contas_bancarias(cliente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_contas_tipo_ativo ON contas_bancarias(tipo_titular, ativo);",
+    "CREATE INDEX IF NOT EXISTS idx_emprestimos_cliente ON emprestimos(cliente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_emprestimos_status ON emprestimos(status);",
+    "CREATE INDEX IF NOT EXISTS idx_emprestimos_data ON emprestimos(data_emprestimo);",
+    "CREATE INDEX IF NOT EXISTS idx_movimentacoes_emprestimo ON movimentacoes_emprestimo(emprestimo_id);",
+    "CREATE INDEX IF NOT EXISTS idx_movimentacoes_data ON movimentacoes_emprestimo(data_movimento);",
+    "CREATE INDEX IF NOT EXISTS idx_movimentacoes_pagamento_integrado ON movimentacoes_emprestimo(pagamento_integrado_id);",
+    "CREATE INDEX IF NOT EXISTS idx_movimentacoes_tipo_competencia ON movimentacoes_emprestimo(tipo, competencia);",
+    "CREATE INDEX IF NOT EXISTS idx_movimentacoes_titulo_receber ON movimentacoes_emprestimo(titulo_receber_id);",
+    "CREATE INDEX IF NOT EXISTS idx_movimentacoes_conta_origem ON movimentacoes_emprestimo(conta_origem_id);",
+    "CREATE INDEX IF NOT EXISTS idx_movimentacoes_conta_destino ON movimentacoes_emprestimo(conta_destino_id);",
+    "CREATE INDEX IF NOT EXISTS idx_titulos_receber_vencimento ON titulos_receber(data_vencimento);",
+    "CREATE INDEX IF NOT EXISTS idx_titulos_receber_status ON titulos_receber(status);",
+    "CREATE INDEX IF NOT EXISTS idx_titulos_receber_emprestimo ON titulos_receber(emprestimo_id);",
+    "CREATE INDEX IF NOT EXISTS idx_titulos_receber_competencia ON titulos_receber(emprestimo_id, competencia);",
+    "CREATE INDEX IF NOT EXISTS idx_titulos_receber_status_vencimento ON titulos_receber(status, data_vencimento, emprestimo_id);",
+    "CREATE INDEX IF NOT EXISTS idx_titulos_receber_origem ON titulos_receber(titulo_origem_id);",
+    "CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_cliente ON pagamentos_integrados(cliente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_data ON pagamentos_integrados(data_pagamento);",
+    "CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_itens_pagamento ON pagamentos_integrados_itens(pagamento_integrado_id);",
+    "CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_itens_emprestimo ON pagamentos_integrados_itens(emprestimo_id);",
+    "CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_itens_titulo ON pagamentos_integrados_itens(titulo_receber_id);",
+    "CREATE INDEX IF NOT EXISTS idx_cartoes_cliente ON cartoes_credito(cliente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_lancamentos_cartao ON lancamentos_cartao(cartao_credito_id);",
+    "CREATE INDEX IF NOT EXISTS idx_parcelas_vencimento ON parcelas_cartao(vencimento);",
+    "CREATE INDEX IF NOT EXISTS idx_parcelas_status ON parcelas_cartao(status);",
+    "CREATE INDEX IF NOT EXISTS idx_parcelas_conta_origem ON parcelas_cartao(conta_origem_id);",
+    "CREATE INDEX IF NOT EXISTS idx_parcelas_conta_destino ON parcelas_cartao(conta_destino_id);",
+    "CREATE INDEX IF NOT EXISTS idx_auditoria_entidade ON auditoria(entidade, entidade_id);",
+    "CREATE INDEX IF NOT EXISTS idx_auditoria_created_at ON auditoria(created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_comprovantes_cliente ON comprovantes_pagamento(cliente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_comprovantes_status ON comprovantes_pagamento(status);",
+    "CREATE INDEX IF NOT EXISTS idx_comprovantes_itens_titulo ON comprovantes_pagamento_itens(titulo_receber_id);",
+]
 
 def migrate_postgres(conn: PostgresConnection) -> None:
     global _pg_migrated
@@ -172,6 +273,14 @@ def migrate_postgres(conn: PostgresConnection) -> None:
                 """)
             except Exception:
                 pass
+
+            # Cria todos os índices de alta performance no PostgreSQL
+            for idx_sql in PG_INDEXES:
+                try:
+                    cur.execute(idx_sql)
+                except Exception:
+                    pass
+
         conn._conn.set_isolation_level(old_level)
         _pg_migrated = True
     except Exception:
@@ -187,7 +296,13 @@ def current_database_path() -> str:
 def get_db():
     if "db" not in g:
         if is_postgres():
-            g.db = PostgresConnection(get_database_url())
+            url = get_database_url()
+            pool = None
+            try:
+                pool = get_pg_pool(url)
+            except Exception:
+                pool = None
+            g.db = PostgresConnection(url, pool=pool)
             migrate_postgres(g.db)
         else:
             connection = sqlite3.connect(

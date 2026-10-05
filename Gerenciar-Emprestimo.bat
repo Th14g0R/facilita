@@ -2,7 +2,7 @@
 setlocal EnableExtensions DisableDelayedExpansion
 title Sistema Emprestimo - Gerenciador
 
-set "REPO_RAW=https://raw.githubusercontent.com/Th14g0R/emprestimo/release/v2/scripts/Gerenciar-Emprestimo.ps1"
+set "REPO_RAW=https://raw.githubusercontent.com/Th14g0R/facilita/main/scripts/Gerenciar-Emprestimo.ps1"
 set "LOCAL_SCRIPT=%~dp0scripts\Gerenciar-Emprestimo.ps1"
 set "BOOT_DIR=%TEMP%\EmprestimoBootstrap"
 set "BOOT_SCRIPT=%BOOT_DIR%\Gerenciar-Emprestimo.ps1"

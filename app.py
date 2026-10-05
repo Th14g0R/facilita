@@ -39,6 +39,32 @@ from version import APP_VERSION
 
 BASE_DIR = Path(__file__).resolve().parent
 
+# Carrega configurações do arquivo .env (via python-dotenv ou parser resiliente nativo)
+is_running_tests = "unittest" in sys.modules or any("unittest" in arg.lower() for arg in sys.argv)
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / ".env", override=False)
+except ImportError:
+    _env_path = BASE_DIR / ".env"
+    if _env_path.exists():
+        try:
+            with open(_env_path, "r", encoding="utf-8") as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if _line and not _line.startswith("#") and "=" in _line:
+                        _k, _v = _line.split("=", 1)
+                        _k = _k.strip()
+                        _v = _v.strip().strip("'\"")
+                        if _k not in os.environ:
+                            os.environ[_k] = _v
+        except Exception:
+            pass
+
+if is_running_tests:
+    # Testes unitários operam estritamente em SQLite temporário isolado
+    os.environ.pop("DATABASE_URL", None)
+
 # Em Windows/local, o padrão continua sendo <projeto>/data.
 # Em hospedagens com volume persistente, EMPRESTIMO_DATA_DIR permite apontar
 # banco e chave para o diretório persistente fornecido pelo provedor.
@@ -142,13 +168,17 @@ def create_app() -> Flask:
             return e
         import traceback
         tb = traceback.format_exc()
-        app.logger.error("Erro interno no servidor:\n%s", tb)
+        is_debug = app.debug or env_bool("EMPRESTIMO_DEBUG", False)
+        detalhes_html = (
+            f"<pre style='background:#ffffff; padding:1rem; border-radius:6px; border:1px solid #fecaca; color:#991b1b; overflow:auto; font-size:13px; white-space:pre-wrap;'>{tb}\nExcecao: {e}</pre>"
+            if is_debug else
+            "<p style='color:#7f1d1d; font-size:14px; margin-bottom:1.5rem;'>Ocorreu uma instabilidade momentânea no processamento. A ocorrência foi registrada de forma segura nos logs do sistema.</p>"
+        )
         return (
             "<div style='font-family:system-ui,-apple-system,sans-serif; padding:2rem; max-width:860px; margin:2rem auto; border:1px solid #fca5a5; border-radius:8px; background:#fef2f2;'>"
             "<h2 style='color:#b91c1c; margin-top:0;'>Erro interno ao carregar a página</h2>"
-            "<p style='color:#7f1d1d;'>O servidor encontrou um problema ao processar esta requisição. Detalhes técnicos:</p>"
-            f"<pre style='background:#ffffff; padding:1rem; border-radius:6px; border:1px solid #fecaca; color:#991b1b; overflow:auto; font-size:13px; white-space:pre-wrap;'>{tb}\nExcecao: {e}</pre>"
-            "<p><a href='/dashboard' style='color:#2563eb;'>← Voltar para o início</a></p>"
+            f"{detalhes_html}"
+            "<p><a href='/dashboard' style='color:#2563eb; text-decoration:underline;'>← Voltar para o início</a></p>"
             "</div>",
             500,
         )
@@ -605,6 +635,29 @@ def sync_receivable_titles(db: sqlite3.Connection, months_ahead: int = 2) -> Non
     """
     today = date.today()
     current_month = first_day_of_month(today)
+    today_iso = today.isoformat()
+
+    # Otimização em lote: sincroniza status por vencimento em operações únicas de banco
+    db.execute(
+        """
+        UPDATE titulos_receber
+           SET status = 'VENCIDO', updated_at = CURRENT_TIMESTAMP
+         WHERE tipo = 'JUROS'
+           AND status = 'PREVISTO'
+           AND data_vencimento < ?
+        """,
+        (today_iso,),
+    )
+    db.execute(
+        """
+        UPDATE titulos_receber
+           SET status = 'PREVISTO', updated_at = CURRENT_TIMESTAMP
+         WHERE tipo = 'JUROS'
+           AND status = 'VENCIDO'
+           AND data_vencimento >= ?
+        """,
+        (today_iso,),
+    )
 
     existing_titles = db.execute(
         """

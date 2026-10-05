@@ -262,3 +262,42 @@ CREATE TABLE IF NOT EXISTS limites_publicos (
     inicio BIGINT NOT NULL,
     tentativas INTEGER NOT NULL
 );
+
+-- Índices de Alta Performance (Supabase PostgreSQL)
+CREATE INDEX IF NOT EXISTS idx_clientes_nome ON clientes(nome);
+CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf);
+CREATE INDEX IF NOT EXISTS idx_contas_cliente ON contas_bancarias(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_contas_tipo_ativo ON contas_bancarias(tipo_titular, ativo);
+CREATE INDEX IF NOT EXISTS idx_emprestimos_cliente ON emprestimos(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_emprestimos_status ON emprestimos(status);
+CREATE INDEX IF NOT EXISTS idx_emprestimos_data ON emprestimos(data_emprestimo);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_emprestimo ON movimentacoes_emprestimo(emprestimo_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_data ON movimentacoes_emprestimo(data_movimento);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_pagamento_integrado ON movimentacoes_emprestimo(pagamento_integrado_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_tipo_competencia ON movimentacoes_emprestimo(tipo, competencia);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_titulo_receber ON movimentacoes_emprestimo(titulo_receber_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_conta_origem ON movimentacoes_emprestimo(conta_origem_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_conta_destino ON movimentacoes_emprestimo(conta_destino_id);
+CREATE INDEX IF NOT EXISTS idx_titulos_receber_vencimento ON titulos_receber(data_vencimento);
+CREATE INDEX IF NOT EXISTS idx_titulos_receber_status ON titulos_receber(status);
+CREATE INDEX IF NOT EXISTS idx_titulos_receber_emprestimo ON titulos_receber(emprestimo_id);
+CREATE INDEX IF NOT EXISTS idx_titulos_receber_competencia ON titulos_receber(emprestimo_id, competencia);
+CREATE INDEX IF NOT EXISTS idx_titulos_receber_status_vencimento ON titulos_receber(status, data_vencimento, emprestimo_id);
+CREATE INDEX IF NOT EXISTS idx_titulos_receber_origem ON titulos_receber(titulo_origem_id);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_cliente ON pagamentos_integrados(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_data ON pagamentos_integrados(data_pagamento);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_itens_pagamento ON pagamentos_integrados_itens(pagamento_integrado_id);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_itens_emprestimo ON pagamentos_integrados_itens(emprestimo_id);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_integrados_itens_titulo ON pagamentos_integrados_itens(titulo_receber_id);
+CREATE INDEX IF NOT EXISTS idx_cartoes_cliente ON cartoes_credito(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_lancamentos_cartao ON lancamentos_cartao(cartao_credito_id);
+CREATE INDEX IF NOT EXISTS idx_parcelas_vencimento ON parcelas_cartao(vencimento);
+CREATE INDEX IF NOT EXISTS idx_parcelas_status ON parcelas_cartao(status);
+CREATE INDEX IF NOT EXISTS idx_parcelas_conta_origem ON parcelas_cartao(conta_origem_id);
+CREATE INDEX IF NOT EXISTS idx_parcelas_conta_destino ON parcelas_cartao(conta_destino_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_entidade ON auditoria(entidade, entidade_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_created_at ON auditoria(created_at);
+CREATE INDEX IF NOT EXISTS idx_comprovantes_cliente ON comprovantes_pagamento(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_comprovantes_status ON comprovantes_pagamento(status);
+CREATE INDEX IF NOT EXISTS idx_comprovantes_itens_titulo ON comprovantes_pagamento_itens(titulo_receber_id);
+

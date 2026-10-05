@@ -71,7 +71,12 @@ def migrar(sqlite_path: str, pg_uri: str):
         raise
 
 if __name__ == "__main__":
-    db_file = sys.argv[1] if len(sys.argv) > 1 else "/Users/thiago/Dev/facilita/data/emprestimos.db"
+    from pathlib import Path
+    default_db = os.environ.get(
+        "EMPRESTIMO_DATABASE",
+        str(Path(__file__).resolve().parent.parent / "data" / "emprestimos.db")
+    )
+    db_file = sys.argv[1] if len(sys.argv) > 1 else default_db
     uri = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("DATABASE_URL")
     if not uri:
         print("Defina a variável DATABASE_URL ou informe como segundo parâmetro.")
