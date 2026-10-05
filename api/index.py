@@ -39,3 +39,5 @@ except Exception as _e:
         </html>
         """
         return [html.encode('utf-8')]
+
+handler = app
