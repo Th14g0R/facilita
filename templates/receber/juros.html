@@ -5,25 +5,50 @@
 <form method="post">{{ csrf() }}<div class="form-grid">{{ field('competencia','Competência',form.competencia,type='month',required=true) }}{{ field('data_movimento','Data efetiva do pagamento',form.data_movimento,type='date',required=true) }}</div>
 <button class="button" id="btn_recalcular" name="acao" value="prever" formnovalidate>Calcular para esta data</button>
 {% if planos and planos[0].dias_atraso > 0 %}
-<div class="panel" style="background: var(--bg-card, #1c2128); border: 1px solid var(--border-color, #30363d); border-radius: 8px; padding: 1.1rem; margin: 1rem 0;">
+<div class="panel" style="background: var(--bg-card, #1c2128); border: 1px solid var(--border-color, #30363d); border-radius: 8px; padding: 1.25rem; margin: 1.2rem 0;">
+  <input type="hidden" name="tipo_ajuste_atraso" id="tipo_ajuste_atraso" value="{{ request.form.get('tipo_ajuste_atraso', '') }}">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
     <h3 style="margin:0; font-size:1.05rem; display:flex; align-items:center; gap:0.5rem;">
-      <span>⚖️</span> <strong>Condições de atraso (Acordo / Feriado / Tolerância)</strong>
+      <span>⚖️</span> <strong>Condições de atraso (Acordo / Tolerância / Feriado)</strong>
     </h3>
     <span class="badge warning">{{ planos[0].dias_atraso }} dia(s) de atraso</span>
   </div>
-  <p class="muted" style="margin-bottom:0.8rem; font-size:0.92rem; line-height:1.4;">
-    Atraso calculado em <strong>{{ planos[0].juros_atraso_calculado_centavos|money }}</strong>. Você pode perdoar integralmente ou aplicar um desconto preservando a data efetiva de pagamento.
+  <p class="muted" style="margin-bottom:1rem; font-size:0.92rem; line-height:1.45;">
+    Cálculo apurado: <strong>{{ planos[0].juros_atraso_calculado_centavos|money }}</strong> de juros adicionais por atraso. Defina um <strong>valor específico a cobrar</strong>, aplique um <strong>desconto</strong> ou <strong>abone integralmente</strong> preservando a data efetiva ({{ form.data_movimento|date_br }}).
   </p>
-  <div style="display:flex; flex-wrap:wrap; gap:1.25rem; align-items:center;">
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: start; background: rgba(0,0,0,0.18); padding: 1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 1rem;">
+    <div>
+      <label for="juros_especifico" style="display:block; font-size:0.88rem; font-weight:600; margin-bottom:0.35rem;">
+        Definir juros de atraso a cobrar (R$):
+      </label>
+      <input type="text" name="juros_especifico" id="juros_especifico" value="{{ form.juros_especifico or '' }}" placeholder="0,00" class="money-input" style="width: 100%; padding: 0.45rem 0.65rem;" oninput="document.getElementById('tipo_ajuste_atraso').value='juros_especifico'; document.getElementById('chk_abonar_atraso').checked=false;">
+      <span class="muted" style="font-size:0.78rem; display:block; margin-top:0.25rem;">Valor exato acordado para os juros de atraso.</span>
+    </div>
+
+    <div>
+      <label for="desconto_atraso" style="display:block; font-size:0.88rem; font-weight:600; margin-bottom:0.35rem;">
+        Ou aplicar desconto nos juros (R$):
+      </label>
+      <input type="text" name="desconto_atraso" id="desconto_atraso" value="{{ form.desconto_atraso or '' }}" placeholder="0,00" class="money-input" style="width: 100%; padding: 0.45rem 0.65rem;" oninput="document.getElementById('tipo_ajuste_atraso').value='desconto'; document.getElementById('chk_abonar_atraso').checked=false;">
+      <span class="muted" style="font-size:0.78rem; display:block; margin-top:0.25rem;">Desconto deduzido dos {{ planos[0].juros_atraso_calculado_centavos|money }} calculados.</span>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:0.75rem;">
     <label class="check" style="font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-      <input type="checkbox" name="abonar_atraso" value="1" id="chk_abonar_atraso" {% if form.abonar_atraso %}checked{% endif %} onchange="document.getElementById('btn_recalcular').click();">
-      <span>Abonar juros de atraso (Cobrar juro original de {{ planos[0].valor_base_centavos|money }})</span>
+      <input type="checkbox" name="abonar_atraso" value="1" id="chk_abonar_atraso" {% if form.abonar_atraso %}checked{% endif %} onchange="if(this.checked){ document.getElementById('tipo_ajuste_atraso').value='abono'; if(document.getElementById('juros_especifico')) document.getElementById('juros_especifico').value='0,00'; } document.getElementById('btn_recalcular_juros').click();">
+      <span>Abonar 100% dos juros de atraso (Cobrar juro original de {{ planos[0].valor_base_centavos|money }})</span>
     </label>
-    <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
-      <label for="desconto_atraso" style="font-size:0.9rem; margin:0; white-space:nowrap;">Ou desconto parcial (R$):</label>
-      <input type="text" name="desconto_atraso" id="desconto_atraso" value="{{ form.desconto_atraso or '' }}" placeholder="0,00" class="money-input" style="max-width: 120px; padding: 0.4rem 0.6rem;">
-      <button class="button small" name="acao" value="prever" formnovalidate>Aplicar desconto</button>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      {% if planos[0].desconto_atraso_centavos > 0 or form.abonar_atraso %}
+      <button type="submit" class="button small" name="acao" value="restaurar_calculo" title="Desfazer ajustes e restaurar cálculo proporcional integral" formnovalidate>
+        Restaurar cálculo integral
+      </button>
+      {% endif %}
+      <button type="submit" class="button small" id="btn_recalcular_juros" name="acao" value="prever" formnovalidate style="font-weight:600;">
+        🔄 Recalcular juros
+      </button>
     </div>
   </div>
 </div>

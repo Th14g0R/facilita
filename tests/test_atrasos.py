@@ -89,6 +89,35 @@ class CalculoTests(unittest.TestCase):
         self.assertEqual(res['juros_atraso_centavos'], 1833)
         self.assertEqual(res['valor_total_centavos'], 51833)
 
+    def test_definir_juros_especifico_de_atraso(self):
+        t = dict(id=1, emprestimo_id=1, competencia='2026-10', natureza='JUROS', status='PREVISTO',
+                 data_emprestimo='2026-09-01', data_vencimento='2026-10-03', valor_previsto_centavos=50000)
+        # O usuário quer cobrar exatamente R$ 10,00 (1000 centavos) de juros de atraso
+        res = calcular(t, date(2026, 10, 5), juros_especifico_centavos=1000)
+        self.assertEqual(res['juros_atraso_calculado_centavos'], 3333)
+        self.assertEqual(res['juros_atraso_centavos'], 1000)
+        self.assertEqual(res['desconto_atraso_centavos'], 2333)
+        self.assertFalse(res['abonado'])
+        self.assertEqual(res['valor_total_centavos'], 51000)
+
+    def test_juros_especifico_zero_equivale_a_abono_completo(self):
+        t = dict(id=1, emprestimo_id=1, competencia='2026-10', natureza='JUROS', status='PREVISTO',
+                 data_emprestimo='2026-09-01', data_vencimento='2026-10-03', valor_previsto_centavos=50000)
+        res = calcular(t, date(2026, 10, 5), juros_especifico_centavos=0)
+        self.assertEqual(res['juros_atraso_centavos'], 0)
+        self.assertEqual(res['desconto_atraso_centavos'], 3333)
+        self.assertTrue(res['abonado'])
+        self.assertEqual(res['valor_total_centavos'], 50000)
+
+    def test_juros_especifico_acima_do_calculado_e_limitado_ao_teto_legal(self):
+        t = dict(id=1, emprestimo_id=1, competencia='2026-10', natureza='JUROS', status='PREVISTO',
+                 data_emprestimo='2026-09-01', data_vencimento='2026-10-03', valor_previsto_centavos=50000)
+        # Se passar R$ 50,00 (5000 centavos) de juros de atraso quando o cálculo deu 33,33, limita a 33,33
+        res = calcular(t, date(2026, 10, 5), juros_especifico_centavos=5000)
+        self.assertEqual(res['juros_atraso_centavos'], 3333)
+        self.assertEqual(res['desconto_atraso_centavos'], 0)
+        self.assertEqual(res['valor_total_centavos'], 53333)
+
 
 class AtrasoHTTPTests(unittest.TestCase):
     def setUp(self):
@@ -304,6 +333,58 @@ class AtrasoHTTPTests(unittest.TestCase):
         self.assertEqual(row['status'], 'RECEBIDO')
         self.assertEqual(row['valor_recebido_centavos'], 96667)
         self.assertEqual(row['juros_atraso_centavos'], 16667)
+
+    def test_receber_titulo_com_juros_especifico_acordado(self):
+        # O atraso calculou R$ 266,67 (26667 centavos). O operador acorda cobrar R$ 150,00 de juros.
+        data = dict(data_recebimento=self.today.isoformat(), conta_origem_id='2', conta_destino_id='1',
+                    juros_especifico='150,00', tipo_ajuste_atraso='juros_especifico')
+        preview = self.c.post(f'/receber/{self.tid}', acao='prever', **data)
+        self.assertIn('Recalcular juros', preview.get_data(as_text=True))
+        token = self.token(preview)
+
+        # O total deve ser R$ 800,00 + R$ 150,00 = R$ 950,00
+        response = self.c.post(f'/receber/{self.tid}', acao='confirmar', assinatura=token,
+                               valor_recebido='950,00', **data)
+        self.assertEqual(response.status_code, 302)
+
+        row = self.row()
+        self.assertEqual(row['status'], 'RECEBIDO')
+        self.assertEqual(row['valor_recebido_centavos'], 95000)
+        self.assertEqual(row['juros_atraso_centavos'], 15000)
+
+        mov = self.c.rows("SELECT * FROM movimentacoes_emprestimo WHERE titulo_receber_id=?", (self.tid,))[0]
+        self.assertEqual(mov['valor_centavos'], 95000)
+        self.assertIn('acordados', mov['observacao'])
+
+        # Integridade do contrato preservada
+        with self.app.app_context():
+            db = application.get_db()
+            application.recalcular_emprestimo_por_movimentacoes(db, 1)
+
+    def test_restaurar_calculo_integral_de_juros(self):
+        # Após digitar um desconto ou abono, o operador clica em restaurar cálculo integral
+        data = dict(data_recebimento=self.today.isoformat(), conta_origem_id='2', conta_destino_id='1',
+                    abonar_atraso='1', juros_especifico='0,00')
+        preview = self.c.post(f'/receber/{self.tid}', acao='restaurar_calculo', **data)
+        html = preview.get_data(as_text=True)
+        # O cálculo integral de 10 dias (R$ 266,67) é restaurado no total de R$ 1.066,67
+        self.assertIn('1.066,67', html)
+
+    def test_receber_juros_contrato_com_valor_especifico(self):
+        # Entrada pelo contrato com juros específico acordado de R$ 120,00
+        data = dict(competencia=self.due.strftime('%Y-%m'), data_movimento=self.today.isoformat(),
+                    conta_origem_id='2', conta_destino_id='1',
+                    juros_especifico='120,00', tipo_ajuste_atraso='juros_especifico')
+        preview = self.c.post('/emprestimos/1/juros', acao='prever', **data)
+        token = self.token(preview)
+        response = self.c.post('/emprestimos/1/juros', acao='confirmar', assinatura=token, **data)
+        self.assertEqual(response.status_code, 302)
+
+        mov = self.c.rows("SELECT * FROM movimentacoes_emprestimo WHERE tipo='JUROS' ORDER BY id DESC")[0]
+        # Base R$ 800,00 + R$ 120,00 acordados = R$ 920,00
+        self.assertEqual(mov['valor_centavos'], 92000)
+        self.assertEqual(mov['juros_atraso_centavos'], 12000)
+        self.assertIn('acordados', mov['observacao'])
 
 
 class UpgradeTests(unittest.TestCase):

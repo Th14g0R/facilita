@@ -7,7 +7,7 @@ import json
 from money import MAX_CENTAVOS
 
 
-def calcular(titulo, data_pagamento, *, abonar_atraso=False, desconto_atraso_centavos=0):
+def calcular(titulo, data_pagamento, *, abonar_atraso=False, desconto_atraso_centavos=0, juros_especifico_centavos=None):
     t = dict(titulo)
     if not isinstance(data_pagamento, date):
         raise ValueError('Informe uma data válida para calcular o atraso.')
@@ -28,11 +28,15 @@ def calcular(titulo, data_pagamento, *, abonar_atraso=False, desconto_atraso_cen
     adicional_calculado = int((Decimal(base) * Decimal(dias) / Decimal(30)).quantize(
         Decimal('1'), rounding=ROUND_HALF_UP))
 
-    # Abono ou desconto nos juros de atraso
+    # Abono, valor específico ou desconto nos juros de atraso
     desconto = 0
     if dias > 0 and adicional_calculado > 0:
         if abonar_atraso:
             desconto = adicional_calculado
+        elif juros_especifico_centavos is not None:
+            juros_esp = max(0, int(juros_especifico_centavos))
+            juros_esp = min(adicional_calculado, juros_esp)
+            desconto = adicional_calculado - juros_esp
         elif desconto_atraso_centavos > 0:
             desconto = min(adicional_calculado, int(desconto_atraso_centavos))
 
@@ -47,6 +51,7 @@ def calcular(titulo, data_pagamento, *, abonar_atraso=False, desconto_atraso_cen
                 vencimento_anterior=t['data_vencimento'], dias_atraso=dias,
                 juros_atraso_calculado_centavos=adicional_calculado,
                 desconto_atraso_centavos=desconto,
+                juros_especifico_centavos=adicional_efetivo if juros_especifico_centavos is not None else None,
                 abonado=bool(desconto == adicional_calculado and adicional_calculado > 0),
                 juros_atraso_centavos=adicional_efetivo, valor_total_centavos=total,
                 data_calculo_atraso=data_pagamento.isoformat())
