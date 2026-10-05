@@ -6,7 +6,8 @@ import re
 import secrets
 import sqlite3
 from datetime import date, datetime, timedelta
-from timezone_utils import hoje_brasil, agora_brasil, iso_agora_brasil
+from timezone_utils import hoje_brasil, agora_brasil, iso_agora_brasil, to_brasil
+from email_utils import formatar_tempo_espera, enviar_email_recuperacao, obter_link_whatsapp_ajuda
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -96,8 +97,14 @@ def init_schema() -> None:
     """)
     from database import add_column_if_missing
     add_column_if_missing(db, 'clientes_acessos', 'usuario', 'TEXT')
+    add_column_if_missing(db, 'clientes_acessos', 'reset_token', 'TEXT')
+    add_column_if_missing(db, 'clientes_acessos', 'reset_token_expira', 'TEXT')
     try:
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_acessos_usuario ON clientes_acessos(usuario);")
+    except Exception:
+        pass
+    try:
+        db.execute("CREATE INDEX IF NOT EXISTS idx_clientes_acessos_reset_token ON clientes_acessos(reset_token);")
     except Exception:
         pass
     for name, definition in (
@@ -424,11 +431,10 @@ def register():
             elif existing_client['status'] == 'ATIVO':
                 db.rollback()
                 flash(
-                    'Este cliente já possui acesso ativo. Use a tela de login '
-                    'ou procure o administrador para redefinir a senha.',
+                    'Este cliente já possui acesso ativo. Utilize a recuperação de senha por e-mail ou procure o administrador.',
                     'info',
                 )
-                return redirect(url_for('portal.login'))
+                return redirect(url_for('portal.recuperar_senha'))
             else:
                 db.rollback()
                 flash(
@@ -488,14 +494,31 @@ def login():
         ).fetchone()
         now = agora_brasil()
         blocked = False
+        dt_bloqueio = None
         if row is not None and row['bloqueado_ate']:
             try:
-                blocked = datetime.fromisoformat(row['bloqueado_ate']) > now
-            except ValueError:
+                dt_bloqueio = to_brasil(row['bloqueado_ate'])
+                blocked = bool(dt_bloqueio and dt_bloqueio > now)
+            except (ValueError, TypeError):
                 blocked = False
-        ok = bool(row and row['cliente_ativo'] and not blocked and check_password_hash(row['senha_hash'], password))
-        if not ok:
-            if row is not None and not blocked:
+
+        if blocked and dt_bloqueio:
+            segundos_restantes = max(1, int((dt_bloqueio - now).total_seconds()))
+            tempo_desc = formatar_tempo_espera(segundos_restantes)
+            flash(
+                f'Acesso temporariamente bloqueado por excesso de tentativas. Aguarde {tempo_desc} antes de tentar novamente ou use a recuperação de senha.',
+                'danger',
+            )
+            return render_template('portal/login.html', login=login_val, email=login_val), 401
+
+        senha_correta = bool(
+            row
+            and row['cliente_ativo']
+            and check_password_hash(row['senha_hash'], password)
+        )
+
+        if not senha_correta:
+            if row is not None:
                 fails = int(row['tentativas_falhas'] or 0) + 1
                 until = None
                 if fails >= 5:
@@ -506,10 +529,14 @@ def login():
                     (fails, until, row['id']),
                 )
                 db.commit()
-            flash(
-                'E-mail/usuário ou senha inválidos. Se houver bloqueio temporário, aguarde alguns minutos e tente novamente.',
-                'danger',
-            )
+                if until is not None:
+                    flash(
+                        'Limite de 5 tentativas incorretas atingido. Seu acesso foi temporariamente bloqueado por 15 minutos. Aguarde 15 minutos antes de tentar novamente ou use a recuperação de senha.',
+                        'danger',
+                    )
+                    return render_template('portal/login.html', login=login_val, email=login_val), 401
+
+            flash('E-mail/usuário ou senha inválidos.', 'danger')
             return render_template('portal/login.html', login=login_val, email=login_val), 401
         if row['status'] != 'ATIVO':
             flash(
@@ -541,6 +568,210 @@ def login():
 @bp.post('/portal/logout')
 @portal_required
 def logout(): session.pop('cliente_acesso_id',None); flash('Sessão encerrada.','success'); return redirect(url_for('portal.login'))
+
+
+@bp.route('/portal/esqueci-senha', methods=['GET', 'POST'])
+def esqueci_senha():
+    """Redireciona para o formulário oficial de recuperação de senha."""
+    return redirect(url_for('portal.recuperar_senha'))
+
+
+@bp.route('/portal/recuperar-senha', methods=['GET', 'POST'])
+def recuperar_senha():
+    """
+    Tela com duas opções claras de recuperação:
+    1. Recuperação automática por e-mail com link temporário exclusivo.
+    2. Contato direto com o administrador do sistema.
+    """
+    whatsapp_url = obter_link_whatsapp_ajuda()
+
+    if request.method == 'POST':
+        login_val = (request.form.get('login') or '').strip().lower()
+        if not login_val:
+            flash('Informe seu e-mail ou nome de usuário cadastrado.', 'warning')
+            return render_template('portal/recuperar_senha.html', whatsapp_url=whatsapp_url)
+
+        db = get_db()
+        row = db.execute(
+            """
+            SELECT ca.*, c.nome cliente_nome, c.ativo cliente_ativo, c.telefone cliente_telefone
+              FROM clientes_acessos ca
+              JOIN clientes c ON c.id = ca.cliente_id
+             WHERE lower(ca.email) = lower(?)
+                OR (ca.usuario IS NOT NULL AND lower(ca.usuario) = lower(?))
+             LIMIT 1
+            """,
+            (login_val, login_val),
+        ).fetchone()
+
+        if row is None or not row['cliente_ativo']:
+            # Mensagem segura e informativa que não expõe se o cadastro existe, orientando as duas opções
+            flash(
+                'Se os dados informados corresponderem a uma conta ativa, o link de recuperação foi enviado ao e-mail cadastrado. '
+                'Se você não receber ou não tiver mais acesso ao e-mail, utilize a Opção 2 para falar com o administrador.',
+                'info',
+            )
+            return render_template('portal/recuperar_senha.html', whatsapp_url=whatsapp_url)
+
+        if row['status'] == 'BLOQUEADO':
+            flash(
+                'Este acesso está suspenso pelo administrador. Entre em contato diretamente com o administrador para solicitar a liberação.',
+                'danger',
+            )
+            return render_template('portal/recuperar_senha.html', whatsapp_url=whatsapp_url)
+
+        if row['status'] == 'PENDENTE':
+            flash(
+                'Sua solicitação de acesso ainda está em análise e aguarda liberação do administrador.',
+                'warning',
+            )
+            return render_template('portal/recuperar_senha.html', whatsapp_url=whatsapp_url)
+
+        # Usuário ATIVO: gera token criptográfico com validade de 60 minutos
+        token = secrets.token_urlsafe(32)
+        expira = (agora_brasil() + timedelta(minutes=60)).isoformat(timespec='seconds')
+
+        db.execute(
+            """
+            UPDATE clientes_acessos
+               SET reset_token = ?,
+                   reset_token_expira = ?,
+                   updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?
+            """,
+            (token, expira, row['id']),
+        )
+        db.commit()
+
+        link_recuperacao = url_for('portal.redefinir_senha', token=token, _external=True)
+        enviou, msg_envio = enviar_email_recuperacao(
+            row['email'],
+            row['cliente_nome'],
+            link_recuperacao,
+            validade_minutos=60,
+        )
+
+        registrar_auditoria(
+            db,
+            'cliente_acesso',
+            row['id'],
+            'RECUPERACAO_SENHA_SOLICITADA',
+            json.dumps(
+                {
+                    'cliente_id': int(row['cliente_id']),
+                    'email': row['email'],
+                    'envio_email_sucesso': bool(enviou),
+                    'mensagem_envio': msg_envio,
+                },
+                ensure_ascii=False,
+            ),
+        )
+        db.commit()
+
+        if enviou:
+            flash(
+                f'Instruções enviadas para o e-mail {row["email"]}. '
+                'Verifique sua caixa de entrada e a pasta de spam. O link é válido por 60 minutos.',
+                'success',
+            )
+        else:
+            flash(
+                'Solicitação de recuperação gerada com sucesso. Se o e-mail não chegar em instantes, '
+                'você pode solicitar o link diretamente ao administrador usando a Opção 2 abaixo.',
+                'info',
+            )
+
+        return render_template('portal/recuperar_senha.html', whatsapp_url=whatsapp_url)
+
+    return render_template('portal/recuperar_senha.html', whatsapp_url=whatsapp_url)
+
+
+@bp.route('/portal/redefinir-senha', methods=['GET', 'POST'])
+def redefinir_senha():
+    """Valida o token temporário e permite ao cliente definir uma nova senha."""
+    token = (request.args.get('token') or request.form.get('token') or '').strip()
+
+    if not token:
+        flash('Link de recuperação inválido ou não informado. Solicite um novo link.', 'warning')
+        return redirect(url_for('portal.recuperar_senha'))
+
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT ca.*, c.nome cliente_nome, c.ativo cliente_ativo
+          FROM clientes_acessos ca
+          JOIN clientes c ON c.id = ca.cliente_id
+         WHERE ca.reset_token = ?
+         LIMIT 1
+        """,
+        (token,),
+    ).fetchone()
+
+    if row is None:
+        flash(
+            'Este link de recuperação é inválido ou já foi utilizado. Solicite um novo link ou contate o administrador.',
+            'danger',
+        )
+        return redirect(url_for('portal.recuperar_senha'))
+
+    # Verifica expiração
+    agora = agora_brasil()
+    dt_expira = to_brasil(row['reset_token_expira'])
+    if dt_expira and agora > dt_expira:
+        flash(
+            'Este link de recuperação expirou. Por motivos de segurança, solicite um novo link de redefinição.',
+            'warning',
+        )
+        return redirect(url_for('portal.recuperar_senha'))
+
+    if request.method == 'POST':
+        nova_senha = request.form.get('nova_senha', '')
+        confirmar_senha = request.form.get('confirmar_senha', '')
+        errors = []
+
+        if len(nova_senha) < 6:
+            errors.append('A nova senha deve possuir pelo menos 6 caracteres.')
+        if nova_senha != confirmar_senha:
+            errors.append('A confirmação da nova senha não confere.')
+
+        if errors:
+            for err in errors:
+                flash(err, 'danger')
+            return render_template('portal/redefinir_senha.html', token=token, cliente_nome=row['cliente_nome']), 400
+
+        novo_hash = generate_password_hash(nova_senha)
+        db.execute(
+            """
+            UPDATE clientes_acessos
+               SET senha_hash = ?,
+                   reset_token = NULL,
+                   reset_token_expira = NULL,
+                   tentativas_falhas = 0,
+                   bloqueado_ate = NULL,
+                   updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?
+            """,
+            (novo_hash, row['id']),
+        )
+        registrar_auditoria(
+            db,
+            'cliente_acesso',
+            row['id'],
+            'SENHA_REDEFINIDA_TOKEN',
+            json.dumps(
+                {
+                    'cliente_id': int(row['cliente_id']),
+                    'email': row['email'],
+                },
+                ensure_ascii=False,
+            ),
+        )
+        db.commit()
+
+        flash('Sua senha foi redefinida com sucesso! Você já pode entrar com sua nova senha.', 'success')
+        return redirect(url_for('portal.login'))
+
+    return render_template('portal/redefinir_senha.html', token=token, cliente_nome=row['cliente_nome'])
 
 
 @bp.route('/portal/perfil', methods=['GET', 'POST'])
@@ -1358,6 +1589,65 @@ def edit_access(aid):
         acesso=access,
         form=form,
     )
+
+
+@bp.post('/acessos-clientes/<int:aid>/gerar-link-recuperacao')
+def admin_generate_reset_link(aid):
+    """Gera um link temporário de redefinição exclusivo para o administrador enviar ao cliente."""
+    r = _admin_required()
+    if r:
+        return r
+
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT ca.*, c.nome AS cliente_nome
+          FROM clientes_acessos ca
+          JOIN clientes c ON c.id = ca.cliente_id
+         WHERE ca.id = ?
+        """,
+        (aid,),
+    ).fetchone()
+    if row is None:
+        abort(404)
+
+    token = secrets.token_urlsafe(32)
+    expira = (agora_brasil() + timedelta(hours=24)).isoformat(timespec='seconds')
+
+    db.execute(
+        """
+        UPDATE clientes_acessos
+           SET reset_token = ?,
+               reset_token_expira = ?,
+               tentativas_falhas = 0,
+               bloqueado_ate = NULL,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?
+        """,
+        (token, expira, aid),
+    )
+    registrar_auditoria(
+        db,
+        'cliente_acesso',
+        aid,
+        'LINK_RECUPERACAO_GERADO_ADMIN',
+        json.dumps(
+            {
+                'cliente_id': int(row['cliente_id']),
+                'admin_usuario_id': g.usuario['id'],
+            },
+            ensure_ascii=False,
+        ),
+    )
+    db.commit()
+
+    link = url_for('portal.redefinir_senha', token=token, _external=True)
+    flash(
+        'Link de recuperação gerado com sucesso (válido por 24 horas). '
+        'Copie e envie para o cliente.',
+        'success',
+    )
+    return redirect(url_for('portal.edit_access', aid=aid, reset_link=link))
 
 
 @bp.post('/acessos-clientes/<int:aid>/aprovar')

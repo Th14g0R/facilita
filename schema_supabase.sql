@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS clientes_acessos (
     aprovado_at TEXT,
     aprovado_por_usuario_id INTEGER REFERENCES usuarios(id) ON UPDATE CASCADE ON DELETE SET NULL,
     observacao_admin TEXT,
+    reset_token TEXT,
+    reset_token_expira TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

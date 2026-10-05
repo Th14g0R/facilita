@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.4.1 — 2026-10-05
+
+- **Recuperação de Senha do Portal do Cliente**: nova tela `/portal/recuperar-senha` oferecendo duas opções claras para quando o cliente perde o acesso:
+  1. *Recuperação por E-mail (Automática)*: envio de link temporário exclusivo e criptografado com validade de 60 minutos e layout responsivo.
+  2. *Contato direto com o Administrador*: orientações e botão direto via WhatsApp (`WHATSAPP_SUPORTE`) para assistência humana imediata.
+- **Redefinição Segura via Token**: nova rota `/portal/redefinir-senha` validando prazo de expiração e consumo do token, com auditoria completa de alteração.
+- **Geração de Link pelo Administrador**: novo botão em `Acessos ao Portal` permitindo ao administrador gerar instantaneamente um link seguro com validade de 24 horas para enviar ao cliente pelo WhatsApp ou e-mail.
+- **Controle Preciso de Bloqueio Temporário**: a mensagem de bloqueio por tentativas excessivas agora é exibida **somente quando a conta está efetivamente bloqueada**, calculando e informando com exatidão o tempo restante de espera (ex: *15 minutos*, *14 minutos*, *45 segundos*). Falhas convencionais de login exibem mensagem limpa sem falsos alertas de bloqueio.
+- **Módulo Transacional `email_utils.py`**: suporte completo a servidores SMTP (Gmail, SES, SendGrid, Mailgun) configuráveis via variáveis de ambiente com fallback resiliente.
+- **Suíte de Testes Automatizados**: inclusão de `tests/test_recuperacao_senha.py` elevando a cobertura para 182 testes validados com 100% de sucesso.
+
 ## 2.4.0 — 2026-10-05
 
 - Mini Sidebar colapsada com Hover Suspenso (estilo Beatrix): quando recolhida, a barra lateral passa a exibir um trilho compacto de 68px com ícones centralizados; ao passar o mouse, expande suavemente como um menu suspenso flutuante sobre a página sem deslocar o conteúdo.

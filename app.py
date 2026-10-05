@@ -45,6 +45,7 @@ from timezone_utils import (
     format_date_br,
     format_datetime_br,
 )
+from email_utils import formatar_tempo_espera
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -1963,22 +1964,31 @@ def register_routes(app: Flask) -> None:
 
             agora = agora_brasil()
             bloqueado = False
+            dt_bloqueio = None
             if usuario is not None and usuario["bloqueado_ate"]:
                 try:
                     dt_bloqueio = to_brasil(usuario["bloqueado_ate"])
-                    bloqueado = dt_bloqueio > agora if dt_bloqueio else False
+                    bloqueado = bool(dt_bloqueio and dt_bloqueio > agora)
                 except (ValueError, TypeError):
                     bloqueado = False
+
+            if bloqueado and dt_bloqueio:
+                segundos_restantes = max(1, int((dt_bloqueio - agora).total_seconds()))
+                tempo_desc = formatar_tempo_espera(segundos_restantes)
+                flash(
+                    f"Acesso temporariamente bloqueado por excesso de tentativas. Aguarde {tempo_desc} antes de tentar novamente.",
+                    "danger",
+                )
+                return render_template("login.html", login=login_usuario), 401
 
             senha_correta = bool(
                 usuario is not None
                 and usuario["ativo"]
-                and not bloqueado
                 and check_password_hash(usuario["senha_hash"], senha)
             )
 
             if not senha_correta:
-                if usuario is not None and not bloqueado:
+                if usuario is not None:
                     falhas = int(usuario["tentativas_falhas"] or 0) + 1
                     bloqueado_ate = None
                     if falhas >= 5:
@@ -1998,11 +2008,14 @@ def register_routes(app: Flask) -> None:
                     )
                     db.commit()
 
-                flash(
-                    "Login ou senha inválidos. Se houver bloqueio temporário, "
-                    "aguarde alguns minutos e tente novamente.",
-                    "danger",
-                )
+                    if bloqueado_ate is not None:
+                        flash(
+                            "Limite de 5 tentativas incorretas atingido. Seu acesso foi temporariamente bloqueado por 15 minutos. Aguarde 15 minutos antes de tentar novamente.",
+                            "danger",
+                        )
+                        return render_template("login.html", login=login_usuario), 401
+
+                flash("Login ou senha inválidos.", "danger")
                 return render_template("login.html", login=login_usuario), 401
 
             db.execute(

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, csrf with context %}
+{% block title %}Criar nova senha - Portal do Cliente{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">PORTAL DO CLIENTE</p>
+    <h1>Criar nova senha</h1>
+  </div>
+  <div class="actions">
+    <a class="button" href="{{ url_for('portal.login') }}">← Ir para o login</a>
+  </div>
+</header>
+
+<section class="panel auth-panel" style="max-width: 480px; margin: 0 auto;">
+  <div style="margin-bottom: 20px;">
+    <h2 style="margin: 0 0 6px 0; font-size: 1.15rem;">Olá, {{ cliente_nome }}!</h2>
+    <p class="muted" style="margin: 0; font-size: 0.92rem;">
+      Defina abaixo sua nova senha de acesso ao portal (mínimo de 6 caracteres).
+    </p>
+  </div>
+
+  <form method="post" action="{{ url_for('portal.redefinir_senha') }}">
+    {{ csrf() }}
+    <input type="hidden" name="token" value="{{ token }}">
+
+    {{ field('nova_senha', 'Nova senha (mínimo 6 caracteres)', type='password', required=true) }}
+    {{ field('confirmar_senha', 'Confirme a nova senha', type='password', required=true) }}
+
+    <div style="margin-top: 20px;">
+      <button type="submit" class="button primary" style="width: 100%;">
+        Salvar nova senha e entrar
+      </button>
+    </div>
+  </form>
+
+  <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line, #dfe1e6); text-align: center; font-size: 0.88rem;">
+    <a href="{{ url_for('portal.login') }}" style="color: var(--muted);">Cancelar e voltar para o login</a>
+  </div>
+</section>
+{% endblock %}

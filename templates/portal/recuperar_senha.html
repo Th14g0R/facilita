@@ -1,0 +1,96 @@
+{% extends 'base.html' %}{% from '_macros.html' import field, csrf with context %}
+{% block title %}Recuperação de acesso - Portal do Cliente{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">PORTAL DO CLIENTE</p>
+    <h1>Recuperar acesso à sua conta</h1>
+  </div>
+  <div class="actions">
+    <a class="button" href="{{ url_for('portal.login') }}">← Voltar para o login</a>
+  </div>
+</header>
+
+<div class="recovery-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; max-width: 900px; margin: 0 auto;">
+  
+  <!-- Opção 1: Envio do link por E-mail -->
+  <section class="panel" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 4px solid var(--brand, #0052cc);">
+    <div>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span style="background: var(--brand-light, #deebff); color: var(--brand, #0052cc); font-weight: 700; border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; font-size: 14px;">1</span>
+        <h2 style="margin: 0; font-size: 1.15rem;">Recuperar por e-mail</h2>
+      </div>
+      <p class="muted" style="font-size: 0.92rem; line-height: 1.5; margin-bottom: 20px;">
+        Informe seu <strong>e-mail</strong> ou <strong>nome de usuário</strong> cadastrado. Enviaremos imediatamente um link seguro para você redefinir sua senha sem precisar esperar.
+      </p>
+
+      <form method="post" action="{{ url_for('portal.recuperar_senha') }}">
+        {{ csrf() }}
+        {{ field('login', 'E-mail ou Usuário cadastrado', request.form.get('login', ''), required=true) }}
+        
+        <div style="margin-top: 16px;">
+          <button type="submit" class="button primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Enviar link de redefinição
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div style="margin-top: 24px; padding-top: 14px; border-top: 1px dashed var(--line, #dfe1e6); font-size: 0.85rem; color: var(--muted);">
+      ℹ️ O link enviado expira em 60 minutos e pode ser usado apenas uma vez.
+    </div>
+  </section>
+
+  <!-- Opção 2: Contatar Administrador -->
+  <section class="panel" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 4px solid var(--green, #00875a);">
+    <div>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span style="background: var(--green-bg, #e3fcef); color: var(--green, #00875a); font-weight: 700; border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; font-size: 14px;">2</span>
+        <h2 style="margin: 0; font-size: 1.15rem;">Falar com o administrador</h2>
+      </div>
+      <p class="muted" style="font-size: 0.92rem; line-height: 1.5; margin-bottom: 20px;">
+        Não tem mais acesso ao seu e-mail cadastrado, não recebeu o link ou prefere atendimento direto? O administrador da sua conta pode redefinir ou enviar suas credenciais.
+      </p>
+
+      <div style="background: var(--surface-alt, #f4f6f8); border: 1px solid var(--line, #dfe1e6); border-radius: var(--radius-sm, 6px); padding: 16px; margin-bottom: 20px;">
+        <h3 style="margin-top: 0; font-size: 0.95rem; color: var(--ink);">Como funciona o atendimento:</h3>
+        <ul style="margin: 0; padding-left: 20px; font-size: 0.88rem; color: var(--muted); line-height: 1.6;">
+          <li>O administrador confirma sua identidade para segurança da sua conta.</li>
+          <li>Ele gera um novo link ou atualiza sua senha diretamente no painel.</li>
+          <li>Seu histórico de contratos e comprovantes permanece 100% preservado.</li>
+        </ul>
+      </div>
+
+      {% if whatsapp_url %}
+      <a class="button" href="{{ whatsapp_url }}" target="_blank" rel="noopener" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: #25D366; color: #ffffff; border-color: #25D366; font-weight: 600;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.043.072.043.419-.101.824z"/>
+        </svg>
+        Falar com o administrador no WhatsApp
+      </a>
+      {% else %}
+      <div style="background: var(--surface-alt, #f4f6f8); border: 1px dashed var(--line, #dfe1e6); padding: 14px; border-radius: var(--radius-sm, 6px); text-align: center;">
+        <p style="margin: 0; font-size: 0.9rem; color: var(--ink);">
+          Entre em contato com o <strong>administrador responsável</strong> pelos seus contratos e solicite a redefinição ou liberação da sua senha.
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="margin-top: 24px; padding-top: 14px; border-top: 1px dashed var(--line, #dfe1e6); font-size: 0.85rem; color: var(--muted);">
+      🔒 Operação protegida com verificação e registro em auditoria.
+    </div>
+  </section>
+
+</div>
+
+<div style="text-align: center; margin-top: 32px; font-size: 0.9rem;">
+  <a href="{{ url_for('portal.login') }}" style="color: var(--muted); text-decoration: underline;">Voltar para o login</a>
+  <span style="color: var(--line-strong); margin: 0 8px;">·</span>
+  <a href="{{ url_for('portal.register') }}" style="color: var(--muted); text-decoration: underline;">Solicitar novo acesso</a>
+</div>
+{% endblock %}

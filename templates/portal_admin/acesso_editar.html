@@ -11,4 +11,23 @@
 <h2>{{ acesso.cliente_nome }}</h2>
 <form method="post">{{ csrf() }}<div class="form-grid">{{ field('usuario','Nome de usuário (login)',form.usuario) }}{{ field('email','E-mail',form.email,type='email',required=true) }}{{ field('telefone','Telefone',form.telefone) }}{{ select('status','Situação',[{'id':'ATIVO','nome':'Ativo'},{'id':'PENDENTE','nome':'Pendente'},{'id':'BLOQUEADO','nome':'Inativo'},{'id':'REJEITADO','nome':'Rejeitado'}],form.status) }}</div>{{ field('nova_senha','Nova senha (opcional, mínimo 8 caracteres)',type='password') }}{{ field('confirmar_nova_senha','Confirmar nova senha',type='password') }}{{ field('observacao_admin','Observação',form.observacao_admin,type='textarea') }}{{ field('senha_confirmacao','Sua senha de administrador',type='password',required=true) }}<button class="button primary">Salvar acesso</button>
 </form>
+
+{% if request.args.get('reset_link') %}
+<div class="alert success" style="margin-top:24px; padding:16px; border-radius:var(--radius-sm); word-break:break-all;">
+  <strong style="display:block; margin-bottom:6px;">Link de recuperação gerado com sucesso (válido por 24 horas):</strong>
+  <input type="text" readonly value="{{ request.args.get('reset_link') }}" style="width:100%; padding:8px 12px; font-family:monospace; font-size:13px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface);" onclick="this.select();">
+  <small class="muted" style="display:block; margin-top:8px;">Clique para selecionar, copie e envie diretamente para o cliente via WhatsApp ou e-mail.</small>
+</div>
+{% endif %}
+
+<div style="margin-top:28px; padding-top:20px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+  <div>
+    <h3 style="margin:0 0 4px 0; font-size:0.95rem;">Link de recuperação para o cliente</h3>
+    <p class="muted" style="margin:0; font-size:0.85rem;">Gere um link temporário exclusivo para enviar ao cliente caso ele tenha esquecido a senha.</p>
+  </div>
+  <form method="post" action="{{ url_for('portal.admin_generate_reset_link', aid=acesso.id) }}">
+    {{ csrf() }}
+    <button type="submit" class="button">Gerar link para o cliente</button>
+  </form>
+</div>
 </section>{% endblock %}

@@ -9,9 +9,14 @@
 </header>
 <section class="panel auth-panel">
 <p class="muted">Consulte seus contratos e acompanhe seus pagamentos.</p>
-<form method="post">{{ csrf() }}<input type="hidden" name="next" value="{{ request.args.get('next') or request.form.get('next') or '' }}">{{ field('login','E-mail ou Usuário',request.form.get('login', request.form.get('email', '')),type='text',required=true) }}{{ field('senha','Senha',type='password',required=true) }}<button class="button primary">Entrar</button>
+<form method="post">{{ csrf() }}<input type="hidden" name="next" value="{{ request.args.get('next') or request.form.get('next') or '' }}">{{ field('login','E-mail ou Usuário',request.form.get('login', request.form.get('email', '')),type='text',required=true) }}{{ field('senha','Senha',type='password',required=true) }}
+<div style="display:flex; justify-content:flex-end; margin-top:-6px; margin-bottom:16px;">
+  <a href="{{ url_for('portal.recuperar_senha') }}" style="font-size:0.875rem; color:var(--brand, #0052cc); font-weight:550;">Esqueceu a senha?</a>
+</div>
+<button class="button primary" style="width:100%;">Entrar</button>
 </form>
-<p>
-<a href="{{ url_for('portal.register') }}">Solicitar acesso</a>
-</p>
+<div style="margin-top:20px; padding-top:14px; border-top:1px solid var(--line, #dfe1e6); display:flex; justify-content:space-between; align-items:center; font-size:0.875rem;">
+  <a href="{{ url_for('portal.register') }}">Solicitar acesso</a>
+  <a href="{{ url_for('portal.recuperar_senha') }}" style="color:var(--muted);">Recuperar senha</a>
+</div>
 </section>{% endblock %}
