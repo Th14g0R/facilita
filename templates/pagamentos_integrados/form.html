@@ -8,7 +8,15 @@
 <h3>Selecione os títulos a receber</h3>
 <p class="muted">Cada título terá seu próprio cálculo de atraso. Os títulos não selecionados e o principal permanecem inalterados.</p>
 {% for t in titulos_abertos %}<label class="check"><input type="checkbox" name="titulo_id" value="{{ t.id }}" {% if t.id in selected_title_ids %}checked{% endif %}>Título #{{ t.id }} · Contrato #{{ t.emprestimo_id }} · {{ t.competencia|competencia_br }} · vencimento {{ t.data_vencimento|date_br }} · valor registrado {{ t.valor_previsto_centavos|money }}</label>{% else %}<p class="empty">Este cliente não possui títulos em aberto.</p>{% endfor %}
-<button class="button" name="acao" value="prever" formnovalidate>Calcular títulos selecionados</button>
+<div style="display:flex; gap:1rem; align-items:center; margin: 1rem 0; flex-wrap:wrap;">
+  <button class="button" id="btn_recalcular" name="acao" value="prever" formnovalidate>Calcular títulos selecionados</button>
+  {% if planos and resumo_atraso.juros_atraso_calculado_centavos > 0 %}
+  <label class="check" style="margin:0; font-weight:600; cursor:pointer;">
+    <input type="checkbox" name="abonar_atraso" value="1" {% if form.abonar_atraso %}checked{% endif %} onchange="document.getElementById('btn_recalcular').click();">
+    <span>Abonar juros de atraso de todos os títulos selecionados</span>
+  </label>
+  {% endif %}
+</div>
 {% if planos %}<h3>Detalhamento do pagamento agrupado</h3>{% include 'receber/_atraso.html' %}<input type="hidden" name="assinatura" value="{{ assinatura }}">{% endif %}
 {{ banks(form,contas_cliente,contas_proprias) }}{{ field('observacao','Observação',form.observacao,type='textarea') }}
 {% if planos %}<button class="button primary" name="acao" value="confirmar">Confirmar pagamento de {{ resumo_atraso.valor_total_centavos|money }}</button>{% endif %}

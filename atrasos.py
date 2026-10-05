@@ -7,7 +7,7 @@ import json
 from money import MAX_CENTAVOS
 
 
-def calcular(titulo, data_pagamento):
+def calcular(titulo, data_pagamento, *, abonar_atraso=False, desconto_atraso_centavos=0):
     t = dict(titulo)
     if not isinstance(data_pagamento, date):
         raise ValueError('Informe uma data válida para calcular o atraso.')
@@ -25,16 +25,30 @@ def calcular(titulo, data_pagamento):
                                  "antes de calcular novo atraso; o valor antigo foi preservado.")
     vencimento = t.get('data_base_atraso') or t['data_vencimento']
     dias = max(0, (data_pagamento - date.fromisoformat(vencimento)).days)
-    adicional = int((Decimal(base) * Decimal(dias) / Decimal(30)).quantize(
+    adicional_calculado = int((Decimal(base) * Decimal(dias) / Decimal(30)).quantize(
         Decimal('1'), rounding=ROUND_HALF_UP))
-    total = int(base) + adicional
+
+    # Abono ou desconto nos juros de atraso
+    desconto = 0
+    if dias > 0 and adicional_calculado > 0:
+        if abonar_atraso:
+            desconto = adicional_calculado
+        elif desconto_atraso_centavos > 0:
+            desconto = min(adicional_calculado, int(desconto_atraso_centavos))
+
+    adicional_efetivo = max(0, adicional_calculado - desconto)
+    total = int(base) + adicional_efetivo
+
     if base < 0 or total > MAX_CENTAVOS:
         raise ValueError('Valor fora do limite suportado.')
     return dict(titulo_id=t.get('id'), emprestimo_id=t['emprestimo_id'],
                 competencia=t.get('competencia'), cliente_nome=t.get('cliente_nome'),
                 valor_base_centavos=int(base), data_base_atraso=vencimento,
                 vencimento_anterior=t['data_vencimento'], dias_atraso=dias,
-                juros_atraso_centavos=adicional, valor_total_centavos=total,
+                juros_atraso_calculado_centavos=adicional_calculado,
+                desconto_atraso_centavos=desconto,
+                abonado=bool(desconto == adicional_calculado and adicional_calculado > 0),
+                juros_atraso_centavos=adicional_efetivo, valor_total_centavos=total,
                 data_calculo_atraso=data_pagamento.isoformat())
 
 
@@ -43,8 +57,10 @@ def assinatura(itens):
 
 
 def totais(itens):
-    result = {key: sum(i[key] for i in itens) for key in
-              ('valor_base_centavos', 'juros_atraso_centavos', 'valor_total_centavos')}
+    result = {key: sum(i.get(key, 0) for i in itens) for key in
+              ('valor_base_centavos', 'juros_atraso_centavos', 'valor_total_centavos',
+               'juros_atraso_calculado_centavos', 'desconto_atraso_centavos')}
+    result['tem_abono'] = bool(result.get('desconto_atraso_centavos', 0) > 0)
     return result
 
 

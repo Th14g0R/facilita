@@ -1385,7 +1385,11 @@ def recalcular_emprestimo_por_movimentacoes(
                     valor_previsto_centavos=movimento["valor_base_centavos"],
                     data_vencimento=movimento["data_base_atraso"]),
                     date.fromisoformat(movimento["data_movimento"]))
-                valor_esperado = esperado["valor_total_centavos"]
+                juros_efetivo = int(movimento["juros_atraso_centavos"] or 0)
+                if juros_efetivo > esperado["juros_atraso_calculado_centavos"]:
+                    raise ValueError("A correção deixaria os juros registrados inconsistentes. "
+                                     "Estorne o recebimento e confira uma nova prévia.")
+                valor_esperado = int(movimento["valor_base_centavos"]) + juros_efetivo
             else:
                 valor_esperado = calcular_juros_centavos(saldo,emprestimo["taxa_juros_mensal"])
             if valor != valor_esperado:

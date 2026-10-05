@@ -6,7 +6,31 @@
 {% if titulo.status in ['PREVISTO','VENCIDO'] %}
 <form method="post">{{ csrf() }}
 {{ field('data_recebimento','Data efetiva do pagamento',form.data_recebimento,type='date',required=true) }}
-<button class="button" name="acao" value="prever" formnovalidate>Recalcular para esta data</button>
+<button class="button" id="btn_recalcular" name="acao" value="prever" formnovalidate>Recalcular para esta data</button>
+{% if planos and planos[0].dias_atraso > 0 %}
+<div class="panel" style="background: var(--bg-card, #1c2128); border: 1px solid var(--border-color, #30363d); border-radius: 8px; padding: 1.1rem; margin: 1rem 0;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
+    <h3 style="margin:0; font-size:1.05rem; display:flex; align-items:center; gap:0.5rem;">
+      <span>⚖️</span> <strong>Condições de atraso (Acordo / Feriado / Tolerância)</strong>
+    </h3>
+    <span class="badge warning">{{ planos[0].dias_atraso }} dia(s) de atraso</span>
+  </div>
+  <p class="muted" style="margin-bottom:0.8rem; font-size:0.92rem; line-height:1.4;">
+    O atraso gerou cálculo de <strong>{{ planos[0].juros_atraso_calculado_centavos|money }}</strong> de juros adicionais. Você pode <strong>perdoar/abonar</strong> integralmente ou aplicar um desconto sem mudar a data efetiva em que o dinheiro caiu na conta.
+  </p>
+  <div style="display:flex; flex-wrap:wrap; gap:1.25rem; align-items:center;">
+    <label class="check" style="font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+      <input type="checkbox" name="abonar_atraso" value="1" id="chk_abonar_atraso" {% if form.abonar_atraso %}checked{% endif %} onchange="document.getElementById('btn_recalcular').click();">
+      <span>Abonar juros de atraso (Cobrar apenas o original de {{ planos[0].valor_base_centavos|money }})</span>
+    </label>
+    <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+      <label for="desconto_atraso" style="font-size:0.9rem; margin:0; white-space:nowrap;">Ou desconto parcial (R$):</label>
+      <input type="text" name="desconto_atraso" id="desconto_atraso" value="{{ form.desconto_atraso or '' }}" placeholder="0,00" class="money-input" style="max-width: 120px; padding: 0.4rem 0.6rem;">
+      <button class="button small" name="acao" value="prever" formnovalidate>Aplicar desconto</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% include 'receber/_atraso.html' %}
 <input type="hidden" name="assinatura" value="{{ assinatura }}">
 {{ banks(form,contas_cliente,contas_proprias) }}{{ field('observacao','Observação',form.observacao,type='textarea') }}

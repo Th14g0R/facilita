@@ -58,6 +58,37 @@ class CalculoTests(unittest.TestCase):
         t['data_vencimento']='2025-12-31'
         self.assertEqual(calcular(t,date(2026,1,2))['dias_atraso'],2)
 
+    def test_abono_integral_de_atraso(self):
+        # Exemplo real do usuário: Título de R$ 500,00 vencido dia 03/10, recebido dia 05/10.
+        # Juros calculados: R$ 33,33 (3333 centavos).
+        # Com abono, o adicional é zerado e o valor total cobrado volta para R$ 500,00.
+        t = dict(id=1, emprestimo_id=1, competencia='2026-10', natureza='JUROS', status='PREVISTO',
+                 data_emprestimo='2026-09-01', data_vencimento='2026-10-03', valor_previsto_centavos=50000)
+        res_padrao = calcular(t, date(2026, 10, 5))
+        self.assertEqual(res_padrao['dias_atraso'], 2)
+        self.assertEqual(res_padrao['juros_atraso_calculado_centavos'], 3333)
+        self.assertEqual(res_padrao['juros_atraso_centavos'], 3333)
+        self.assertEqual(res_padrao['valor_total_centavos'], 53333)
+
+        res_abonado = calcular(t, date(2026, 10, 5), abonar_atraso=True)
+        self.assertEqual(res_abonado['dias_atraso'], 2)
+        self.assertEqual(res_abonado['juros_atraso_calculado_centavos'], 3333)
+        self.assertEqual(res_abonado['desconto_atraso_centavos'], 3333)
+        self.assertTrue(res_abonado['abonado'])
+        self.assertEqual(res_abonado['juros_atraso_centavos'], 0)
+        self.assertEqual(res_abonado['valor_total_centavos'], 50000)
+
+    def test_desconto_parcial_de_atraso(self):
+        t = dict(id=1, emprestimo_id=1, competencia='2026-10', natureza='JUROS', status='PREVISTO',
+                 data_emprestimo='2026-09-01', data_vencimento='2026-10-03', valor_previsto_centavos=50000)
+        # Desconto de R$ 15,00 (1500 centavos) sobre o atraso de R$ 33,33
+        res = calcular(t, date(2026, 10, 5), desconto_atraso_centavos=1500)
+        self.assertEqual(res['juros_atraso_calculado_centavos'], 3333)
+        self.assertEqual(res['desconto_atraso_centavos'], 1500)
+        self.assertFalse(res['abonado'])
+        self.assertEqual(res['juros_atraso_centavos'], 1833)
+        self.assertEqual(res['valor_total_centavos'], 51833)
+
 
 class AtrasoHTTPTests(unittest.TestCase):
     def setUp(self):
@@ -228,6 +259,51 @@ class AtrasoHTTPTests(unittest.TestCase):
         self.assertEqual(self.row()['valor_base_centavos'],80000)
         self.pay()
         self.assertEqual(self.row()['valor_recebido_centavos'],106667)
+
+    def test_receber_titulo_com_abono_de_atraso(self):
+        # Título vencido há 10 dias. O usuário abona os juros de atraso.
+        data = dict(data_recebimento=self.today.isoformat(), conta_origem_id='2', conta_destino_id='1',
+                    observacao='Acordo de tolerância de fim de semana', abonar_atraso='1')
+        preview = self.c.post(f'/receber/{self.tid}', acao='prever', **data)
+        token = self.token(preview)
+        
+        response = self.c.post(f'/receber/{self.tid}', acao='confirmar', assinatura=token,
+                               valor_recebido='800,00', **data)
+        self.assertEqual(response.status_code, 302)
+        
+        row = self.row()
+        self.assertEqual(row['status'], 'RECEBIDO')
+        self.assertEqual(row['valor_recebido_centavos'], 80000)
+        self.assertEqual(row['valor_base_centavos'], 80000)
+        self.assertEqual(row['dias_atraso'], 10)
+        self.assertEqual(row['juros_atraso_centavos'], 0)
+        self.assertEqual(row['data_recebimento'], self.today.isoformat())
+        
+        mov = self.c.rows("SELECT * FROM movimentacoes_emprestimo WHERE titulo_receber_id=?", (self.tid,))[0]
+        self.assertEqual(mov['valor_centavos'], 80000)
+        self.assertEqual(mov['data_movimento'], self.today.isoformat())
+        self.assertIn('abonados', mov['observacao'])
+        
+        # Garante que o recálculo de integridade do contrato não falha
+        with self.app.app_context():
+            db = application.get_db()
+            application.recalcular_emprestimo_por_movimentacoes(db, 1)
+
+    def test_receber_titulo_com_desconto_parcial(self):
+        # Desconto de R$ 100,00 sobre o atraso de R$ 266,67
+        data = dict(data_recebimento=self.today.isoformat(), conta_origem_id='2', conta_destino_id='1',
+                    desconto_atraso='100,00')
+        preview = self.c.post(f'/receber/{self.tid}', acao='prever', **data)
+        token = self.token(preview)
+        
+        response = self.c.post(f'/receber/{self.tid}', acao='confirmar', assinatura=token,
+                               valor_recebido='966,67', **data)
+        self.assertEqual(response.status_code, 302)
+        
+        row = self.row()
+        self.assertEqual(row['status'], 'RECEBIDO')
+        self.assertEqual(row['valor_recebido_centavos'], 96667)
+        self.assertEqual(row['juros_atraso_centavos'], 16667)
 
 
 class UpgradeTests(unittest.TestCase):

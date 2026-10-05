@@ -47,14 +47,15 @@ def _insert(db, table, values):
     return db.execute(f'INSERT INTO {table} ({columns}) VALUES ({markers})', tuple(values.values())).lastrowid
 
 
-def registrar(db, titulos, data_pagamento, origem, destino, observacao='', *, agrupado=False):
+def registrar(db, titulos, data_pagamento, origem, destino, observacao='', *, agrupado=False, planos=None):
     """O chamador fornece uma transação BEGIN IMMEDIATE já aberta."""
     import app as core
     validar_titulos(db, titulos)
     errors = core.validate_money_flow_accounts(titulos[0]['cliente_id'],origem,destino,is_loan_disbursement=False)
     if errors:
         raise ValueError(' '.join(errors))
-    planos = [calcular(t,data_pagamento) for t in titulos]
+    if planos is None:
+        planos = [calcular(t,data_pagamento) for t in titulos]
     if totais(planos)['valor_total_centavos'] > MAX_CENTAVOS:
         raise ValueError('A soma do pagamento supera o limite suportado.')
     ob,op,dbank,dp = core.get_account_snapshots(origem,destino)
@@ -104,9 +105,9 @@ def _form(core, cliente_id, date_name):
 
 
 def _check_preview(planos):
-    # Clientes antigos sem adicional continuam compatíveis. Com adicional,
+    # Clientes antigos sem adicional continuam compatíveis. Com adicional ou abono/desconto,
     # uma assinatura vincula a confirmação às datas e valores apresentados.
-    if any(p['juros_atraso_centavos'] for p in planos) or request.form.get('acao') == 'confirmar':
+    if any(p['juros_atraso_centavos'] for p in planos) or any(p.get('desconto_atraso_centavos', 0) for p in planos) or request.form.get('acao') == 'confirmar':
         if request.form.get('assinatura') != assinatura(planos):
             raise ValueError('Confira o detalhamento atualizado e confirme novamente.')
 
@@ -120,8 +121,12 @@ def detalhe(titulo_id):
     planos=[]
     data=core.parse_iso_date(form['data_recebimento'])
     try:
+        abonar = form.get('abonar_atraso') in ('1', 'true', 'on', 'sim')
+        desconto_str = form.get('desconto_atraso', '')
+        desconto_centavos = core.parse_money_to_centavos(desconto_str) if desconto_str else 0
+
         if titulo['status'] in {'PREVISTO','VENCIDO'}:
-            planos=[calcular(titulo,data)]
+            planos=[calcular(titulo, data, abonar_atraso=abonar, desconto_atraso_centavos=desconto_centavos)]
         elif titulo['valor_base_centavos'] is not None:
             planos=[dict(snapshot(titulo),titulo_id=titulo['id'],emprestimo_id=titulo['emprestimo_id'],
                 competencia=titulo['competencia'],valor_total_centavos=titulo['valor_recebido_centavos'])]
@@ -130,9 +135,18 @@ def detalhe(titulo_id):
             _check_preview(planos)
             supplied=request.form.get('valor_recebido')
             if supplied and core.parse_money_to_centavos(supplied)!=planos[0]['valor_total_centavos']:
-                raise ValueError('O valor recebido deve corresponder ao total integral com atraso.')
+                raise ValueError('O valor recebido deve corresponder ao total do título (considerando eventual abono/desconto).')
+            obs = form['observacao'].strip()
+            if planos and planos[0].get('desconto_atraso_centavos', 0) > 0:
+                desc_fmt = core.format_money(planos[0]['desconto_atraso_centavos'])
+                if planos[0].get('abonado'):
+                    nota_abono = f"[Juros de atraso abonados: {desc_fmt}]"
+                else:
+                    nota_abono = f"[Desconto em juros de atraso: {desc_fmt}]"
+                obs = f"{obs} {nota_abono}".strip() if obs else nota_abono
+
             registrar(db,[titulo],data,core.parse_int(form['conta_origem_id']),
-                      core.parse_int(form['conta_destino_id']),form['observacao'])
+                      core.parse_int(form['conta_destino_id']),obs,planos=planos)
             db.commit()
             flash('Recebimento confirmado. O detalhamento do atraso foi registrado.','success')
             return redirect(url_for('titulos_receber_detalhe',titulo_id=titulo_id))
@@ -144,6 +158,9 @@ def detalhe(titulo_id):
         core.app.logger.exception('Erro ao receber título')
         flash('O recebimento não foi gravado. Atualize a página e confira o título.','danger')
     form['valor_recebido']=core.format_money(planos[0]['valor_total_centavos']).replace('R$ ','') if planos else ''
+    form['abonar_atraso']='1' if (planos and planos[0].get('abonado')) or form.get('abonar_atraso') in ('1', 'true', 'on', 'sim') else ''
+    if planos and planos[0].get('desconto_atraso_centavos') and not planos[0].get('abonado'):
+        form['desconto_atraso']=core.format_money(planos[0]['desconto_atraso_centavos']).replace('R$ ','')
     return render_template('receber/detalhe.html',titulo=titulo,form=form,
         contas_cliente=accounts,contas_proprias=own,planos=planos,assinatura=assinatura(planos),
         resumo_atraso=totais(planos),titulos_saldo=db.execute(
@@ -174,18 +191,30 @@ def novo():
             rows=carregar(db,selected,cid)
             validar_titulos(db,rows)
             data=core.parse_iso_date(form['data_pagamento'])
-            planos=[calcular(t,data) for t in rows]
+            abonar_geral = form.get('abonar_atraso') in ('1', 'true', 'on', 'sim')
+            planos = []
+            for t in rows:
+                abonar_item = abonar_geral or (form.get(f"abonar_atraso_{t['id']}") in ('1', 'true', 'on', 'sim'))
+                desc_str = form.get(f"desconto_atraso_{t['id']}", '')
+                desc_centavos = core.parse_money_to_centavos(desc_str) if desc_str else 0
+                planos.append(calcular(t, data, abonar_atraso=abonar_item, desconto_atraso_centavos=desc_centavos))
             if request.form.get('acao')!='prever':
                 _check_preview(planos)
                 supplied=request.form.get('valor_total')
                 if supplied and core.parse_money_to_centavos(supplied)!=totais(planos)['valor_total_centavos']:
-                    raise ValueError('O total recebido deve corresponder à soma dos títulos com atraso.')
+                    raise ValueError('O total recebido deve corresponder à soma dos títulos com atraso/abono.')
                 for p in planos:
                     supplied=request.form.get(f"valor_titulo_{p['titulo_id']}")
                     if supplied and core.parse_money_to_centavos(supplied)!=p['valor_total_centavos']:
-                        raise ValueError('Cada título deve ser recebido integralmente, incluindo o atraso.')
+                        raise ValueError('Cada título deve ser recebido integralmente, incluindo o atraso/abono.')
+                obs = form['observacao'].strip()
+                resumo = totais(planos)
+                if resumo.get('desconto_atraso_centavos', 0) > 0:
+                    desc_fmt = core.format_money(resumo['desconto_atraso_centavos'])
+                    nota_abono = f"[Abono/desconto de atraso: {desc_fmt}]"
+                    obs = f"{obs} {nota_abono}".strip() if obs else nota_abono
                 payid,_=registrar(db,rows,data,core.parse_int(form['conta_origem_id']),
-                    core.parse_int(form['conta_destino_id']),form['observacao'],agrupado=True)
+                    core.parse_int(form['conta_destino_id']),obs,agrupado=True,planos=planos)
                 db.commit()
                 flash('Pagamento registrado com o detalhamento individual dos títulos.','success')
                 return redirect(url_for('pagamentos_integrados_detalhe',pagamento_id=payid))
@@ -230,7 +259,10 @@ def juros(emprestimo_id):
                 competencia=competencia,data_vencimento=due.isoformat(),valor_previsto_centavos=base,
                 saldo_base_centavos=saldo,taxa_juros_mensal=loan['taxa_juros_mensal'],status='PREVISTO',
                 natureza='JUROS',data_emprestimo=loan['data_emprestimo'])
-        planos=[calcular(titulo,data)]
+        abonar = form.get('abonar_atraso') in ('1', 'true', 'on', 'sim')
+        desconto_str = form.get('desconto_atraso', '')
+        desconto_centavos = core.parse_money_to_centavos(desconto_str) if desconto_str else 0
+        planos=[calcular(titulo,data,abonar_atraso=abonar,desconto_atraso_centavos=desconto_centavos)]
         if request.method=='POST' and request.form.get('acao')!='prever':
             validar_titulos(db,[titulo])
             _check_preview(planos)
@@ -239,8 +271,16 @@ def juros(emprestimo_id):
                     ('emprestimo_id','competencia','data_vencimento','valor_previsto_centavos',
                      'saldo_base_centavos','taxa_juros_mensal','status','natureza')})
                 titulo=core.get_titulo_receber_or_404(tid)
+            obs = form['observacao'].strip()
+            if planos and planos[0].get('desconto_atraso_centavos', 0) > 0:
+                desc_fmt = core.format_money(planos[0]['desconto_atraso_centavos'])
+                if planos[0].get('abonado'):
+                    nota_abono = f"[Juros de atraso abonados: {desc_fmt}]"
+                else:
+                    nota_abono = f"[Desconto em juros de atraso: {desc_fmt}]"
+                obs = f"{obs} {nota_abono}".strip() if obs else nota_abono
             registrar(db,[titulo],data,core.parse_int(form['conta_origem_id']),
-                core.parse_int(form['conta_destino_id']),form['observacao'])
+                core.parse_int(form['conta_destino_id']),obs,planos=planos)
             db.commit()
             flash('Juros recebidos com detalhamento de atraso. Principal preservado.','success')
             return redirect(url_for('titulos_receber_detalhe',titulo_id=titulo['id']))
