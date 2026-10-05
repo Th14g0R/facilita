@@ -312,8 +312,17 @@ def get_db():
             )
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON;")
-            connection.execute("PRAGMA journal_mode = WAL;")
-            connection.execute("PRAGMA busy_timeout = 5000;")
+            try:
+                if not os.environ.get("VERCEL") and not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+                    connection.execute("PRAGMA journal_mode = WAL;")
+                else:
+                    connection.execute("PRAGMA journal_mode = MEMORY;")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                connection.execute("PRAGMA busy_timeout = 5000;")
+            except sqlite3.OperationalError:
+                pass
             g.db = connection
 
     return g.db

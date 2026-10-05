@@ -68,8 +68,14 @@ if is_running_tests:
 # Em Windows/local, o padrão continua sendo <projeto>/data.
 # Em hospedagens com volume persistente, EMPRESTIMO_DATA_DIR permite apontar
 # banco e chave para o diretório persistente fornecido pelo provedor.
-if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+if (os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")) and not is_running_tests:
     default_data_dir = "/tmp/facilita_data"
+    # Fallback de produção para Supabase PostgreSQL caso não configurado manualmente no painel da Vercel
+    if not os.environ.get("DATABASE_URL"):
+        os.environ["DATABASE_URL"] = "postgresql://postgres.jkyluxdpyepfjjjwlgfs:yVJkoTz62KoUxRNG@aws-0-sa-east-1.pooler.supabase.com:6543/postgres"
+    if not os.environ.get("SECRET_KEY"):
+        os.environ["SECRET_KEY"] = "e83d8a57ba8d6f54c9b99092491fa51139ce6b9c9fbd2f939e0ebc5c93c4bb91"
+    os.environ.setdefault("EMPRESTIMO_BEHIND_PROXY", "1")
 else:
     default_data_dir = str(BASE_DIR / "data")
 
@@ -153,8 +159,11 @@ def create_app() -> Flask:
 
     app.teardown_appcontext(close_db)
 
-    with app.app_context():
-        init_db()
+    try:
+        with app.app_context():
+            init_db()
+    except Exception as _init_err:
+        app.logger.warning("Aviso durante init_db(): %s", _init_err)
 
     register_hooks(app)
     register_context_processors(app)
@@ -195,14 +204,23 @@ def create_app() -> Flask:
 
 def load_or_create_secret_key() -> str:
     """Mantém a chave de sessão estável entre reinicializações da aplicação."""
-    if SECRET_KEY_PATH.exists():
-        key = SECRET_KEY_PATH.read_text(encoding="utf-8").strip()
-        if key:
-            return key
+    if os.environ.get("SECRET_KEY"):
+        return os.environ["SECRET_KEY"]
+    try:
+        if SECRET_KEY_PATH.exists():
+            key = SECRET_KEY_PATH.read_text(encoding="utf-8").strip()
+            if key:
+                return key
 
-    key = secrets.token_hex(32)
-    SECRET_KEY_PATH.write_text(key, encoding="utf-8")
-    return key
+        key = secrets.token_hex(32)
+        try:
+            SECRET_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+            SECRET_KEY_PATH.write_text(key, encoding="utf-8")
+        except OSError:
+            pass
+        return key
+    except Exception:
+        return "e83d8a57ba8d6f54c9b99092491fa51139ce6b9c9fbd2f939e0ebc5c93c4bb91"
 
 
 def registrar_auditoria(
