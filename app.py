@@ -35,6 +35,16 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from version import APP_VERSION
+from timezone_utils import (
+    APP_TIMEZONE,
+    agora_brasil,
+    hoje_brasil,
+    iso_agora_brasil,
+    to_brasil,
+    format_time_br,
+    format_date_br,
+    format_datetime_br,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -235,12 +245,13 @@ def registrar_auditoria(
     detalhes: str | None = None,
 ) -> None:
     usuario_id = g.usuario["id"] if getattr(g, "usuario", None) is not None else None
+    agora_iso = iso_agora_brasil()
     db.execute(
         """
-        INSERT INTO auditoria (usuario_id, entidade, entidade_id, acao, detalhes)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO auditoria (usuario_id, entidade, entidade_id, acao, detalhes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (usuario_id, entidade, entidade_id, acao, detalhes),
+        (usuario_id, entidade, entidade_id, acao, detalhes, agora_iso),
     )
 
 
@@ -323,7 +334,8 @@ def register_context_processors(app: Flask) -> None:
         return {
             "csrf_token": get_csrf_token,
             "datas_titulo": datas_titulo,
-            "hoje": date.today(),
+            "hoje": hoje_brasil(),
+            "agora": agora_brasil(),
             "app_version": APP_VERSION,
         }
 
@@ -352,6 +364,7 @@ def register_template_filters(app: Flask) -> None:
     app.add_template_filter(format_money, "money")
     app.add_template_filter(format_date_br, "date_br")
     app.add_template_filter(format_time_br, "time_br")
+    app.add_template_filter(format_datetime_br, "datetime_br")
     app.add_template_filter(format_percent_br, "percent_br")
     app.add_template_filter(format_competencia_br, "competencia_br")
     app.add_template_filter(format_titulo_status, "titulo_status")
@@ -445,33 +458,6 @@ def format_money(value: int | None) -> str:
     return f"{sinal}R$ {reais_fmt},{cents:02d}"
 
 
-def format_date_br(value: Any) -> str:
-    """
-    Formata datas para dd/mm/aaaa.
-
-    O filtro é usado tanto com valores TEXT vindos do SQLite quanto com
-    objetos date/datetime criados pela aplicação (por exemplo, os períodos
-    da Agenda / A Receber).
-    """
-    if value is None or value == "":
-        return "-"
-
-    if isinstance(value, datetime):
-        return value.date().strftime("%d/%m/%Y")
-
-    if isinstance(value, date):
-        return value.strftime("%d/%m/%Y")
-
-    text = str(value).strip()
-    if not text:
-        return "-"
-
-    try:
-        return date.fromisoformat(text[:10]).strftime("%d/%m/%Y")
-    except (ValueError, TypeError):
-        return text
-
-
 def format_titulo_status(value: Any) -> str:
     """PREVISTO continua no banco, mas é exibido como PENDENTE."""
     text = str(value or "").strip().upper()
@@ -504,19 +490,6 @@ def format_percent_br(value: Any) -> str:
 
     text = format(decimal_value.normalize(), "f")
     return text.replace(".", ",") + "%"
-
-
-def format_time_br(value: Any) -> str:
-    """Extrai o horário formatado HH:MM:SS de um datetime ou string ISO/SQL."""
-    if value is None or value == "":
-        return ""
-    if isinstance(value, datetime):
-        return value.strftime("%H:%M:%S")
-    text = str(value).strip()
-    m = re.search(r"(\d{2}):(\d{2}):(\d{2})", text)
-    if m:
-        return f"{m.group(1)}:{m.group(2)}:{m.group(3)}"
-    return ""
 
 
 def format_entidade_label(entidade: str | None) -> str:
@@ -818,7 +791,7 @@ def due_date_for_competence(competencia: str, dia_vencimento: int) -> date:
 
 
 def get_receivable_periods(reference: date | None = None) -> dict[str, dict[str, Any]]:
-    today = reference or date.today()
+    today = reference or hoje_brasil()
     current_week_start = today - timedelta(days=today.weekday())
     current_week_end = current_week_start + timedelta(days=6)
     next_week_start = current_week_end + timedelta(days=1)
@@ -908,7 +881,7 @@ def sync_receivable_titles(db: sqlite3.Connection, months_ahead: int = 2) -> Non
     competência pode possuir várias movimentações quando houve pagamentos
     parciais.
     """
-    today = date.today()
+    today = hoje_brasil()
     current_month = first_day_of_month(today)
     today_iso = today.isoformat()
 
@@ -1349,7 +1322,7 @@ def status_aberto_por_vencimento(data_vencimento: str | date) -> str:
         if isinstance(data_vencimento, date)
         else date.fromisoformat(str(data_vencimento)[:10])
     )
-    return "VENCIDO" if due < date.today() else "PREVISTO"
+    return "VENCIDO" if due < hoje_brasil() else "PREVISTO"
 
 
 def criar_titulo_saldo_juros(
@@ -1732,6 +1705,7 @@ def recalcular_emprestimo_por_movimentacoes(
 
 @serialized_update
 def refresh_overdue_card_installments(db: sqlite3.Connection) -> None:
+    hoje_iso = hoje_brasil().isoformat()
     db.execute(
         """
         UPDATE parcelas_cartao
@@ -1739,7 +1713,7 @@ def refresh_overdue_card_installments(db: sqlite3.Connection) -> None:
          WHERE status = 'PENDENTE'
            AND vencimento < ?
         """,
-        (date.today().isoformat(),),
+        (hoje_iso,),
     )
     db.execute(
         """
@@ -1749,7 +1723,7 @@ def refresh_overdue_card_installments(db: sqlite3.Connection) -> None:
            AND vencimento >= ?
            AND data_pagamento IS NULL
         """,
-        (date.today().isoformat(),),
+        (hoje_iso,),
     )
     db.commit()
 
@@ -1987,14 +1961,13 @@ def register_routes(app: Flask) -> None:
                 (login_usuario,),
             ).fetchone()
 
-            agora = datetime.now()
+            agora = agora_brasil()
             bloqueado = False
             if usuario is not None and usuario["bloqueado_ate"]:
                 try:
-                    bloqueado = datetime.fromisoformat(
-                        usuario["bloqueado_ate"]
-                    ) > agora
-                except ValueError:
+                    dt_bloqueio = to_brasil(usuario["bloqueado_ate"])
+                    bloqueado = dt_bloqueio > agora if dt_bloqueio else False
+                except (ValueError, TypeError):
                     bloqueado = False
 
             senha_correta = bool(
@@ -2071,7 +2044,7 @@ def register_routes(app: Flask) -> None:
     @login_required
     def dashboard():
         db = get_db()
-        mes_atual = date.today().strftime("%Y-%m")
+        mes_atual = hoje_brasil().strftime("%Y-%m")
 
         metrics = db.execute(
             """
@@ -2205,9 +2178,9 @@ def register_routes(app: Flask) -> None:
             default_inicio = (
                 date.fromisoformat(limites["primeira_data"])
                 if limites and limites["primeira_data"]
-                else date.today()
+                else hoje_brasil()
             )
-            default_fim = date.today()
+            default_fim = hoje_brasil()
 
             data_inicio = (
                 parse_iso_date(data_inicio_text)
@@ -2276,9 +2249,10 @@ def register_routes(app: Flask) -> None:
         if not ultimo_login:
             return "Nunca acessou"
         try:
-            limpo = str(ultimo_login).replace("T", " ")[:19]
-            dt = datetime.fromisoformat(limpo)
-            agora = datetime.now()
+            dt = to_brasil(ultimo_login)
+            if not isinstance(dt, datetime):
+                return str(ultimo_login)[:16]
+            agora = agora_brasil()
             delta = agora - dt
             segundos = int(delta.total_seconds())
 
@@ -3034,7 +3008,7 @@ def register_routes(app: Flask) -> None:
         emprestimo = {
             "cliente_id": cliente_id_query,
             "descricao": "",
-            "data_emprestimo": date.today().isoformat(),
+            "data_emprestimo": hoje_brasil().isoformat(),
             "valor_original": "",
             "taxa_juros_mensal": "",
             "data_primeiro_vencimento": "",
@@ -3120,7 +3094,7 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("emprestimos_detalhe", emprestimo_id=emprestimo_id))
 
         form = {
-            "data_movimento": request.form.get("data_movimento", date.today().isoformat()),
+            "data_movimento": request.form.get("data_movimento", hoje_brasil().isoformat()),
             "valor": request.form.get("valor", ""),
             "observacao": request.form.get("observacao", ""),
             "conta_origem_id": parse_int(request.form.get("conta_origem_id")) if request.method == "POST" else (contas_cliente[0]["id"] if contas_cliente else None),
@@ -3236,7 +3210,7 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("emprestimos_detalhe", emprestimo_id=emprestimo_id))
 
         form = {
-            "data_movimento": request.form.get("data_movimento", date.today().isoformat()),
+            "data_movimento": request.form.get("data_movimento", hoje_brasil().isoformat()),
             "observacao": request.form.get("observacao", ""),
             "conta_origem_id": parse_int(request.form.get("conta_origem_id")) if request.method == "POST" else (contas_cliente[0]["id"] if contas_cliente else None),
             "conta_destino_id": parse_int(request.form.get("conta_destino_id")) if request.method == "POST" else (contas_proprias[0]["id"] if contas_proprias else None),
@@ -4560,7 +4534,7 @@ def register_routes(app: Flask) -> None:
             juros_esperado = None
             if data_vencimento is not None:
                 try:
-                    if data_vencimento <= date.today():
+                    if data_vencimento <= hoje_brasil():
                         saldo_base = saldo_principal_antes_da_data(
                             db,
                             int(titulo["emprestimo_id"]),
@@ -4598,7 +4572,7 @@ def register_routes(app: Flask) -> None:
                 before = titulo_receber_para_auditoria(titulo)
                 novo_status = (
                     "VENCIDO"
-                    if data_vencimento < date.today()
+                    if data_vencimento < hoje_brasil()
                     else "PREVISTO"
                 )
 
@@ -5172,7 +5146,7 @@ def register_routes(app: Flask) -> None:
             flash("Ative o cartão antes de criar novos lançamentos.", "warning")
             return redirect(url_for("cartoes_detalhe", cartao_id=cartao_id))
 
-        data_compra_padrao = date.today()
+        data_compra_padrao = hoje_brasil()
         primeiro_vencimento_padrao = ""
         if cartao["dia_vencimento"]:
             proximo_mes = add_months_iso(
@@ -5238,7 +5212,7 @@ def register_routes(app: Flask) -> None:
                     valores = split_centavos(valor_centavos, quantidade)
                     for index, valor_parcela in enumerate(valores):
                         vencimento = add_months_iso(primeiro_vencimento, index)
-                        status_inicial = "VENCIDO" if vencimento < date.today() else "PENDENTE"
+                        status_inicial = "VENCIDO" if vencimento < hoje_brasil() else "PENDENTE"
                         db.execute(
                             """
                             INSERT INTO parcelas_cartao (
@@ -5470,7 +5444,7 @@ def register_routes(app: Flask) -> None:
                             )
                             status_inicial = (
                                 "VENCIDO"
-                                if vencimento < date.today()
+                                if vencimento < hoje_brasil()
                                 else "PENDENTE"
                             )
 
@@ -5606,7 +5580,7 @@ def register_routes(app: Flask) -> None:
         contas_cliente = get_client_accounts(parcela["cliente_id"])
         contas_proprias = get_own_accounts()
         form = {
-            "data_pagamento": request.form.get("data_pagamento", date.today().isoformat()),
+            "data_pagamento": request.form.get("data_pagamento", hoje_brasil().isoformat()),
             "conta_origem_id": parse_int(request.form.get("conta_origem_id")) if request.method == "POST" else (contas_cliente[0]["id"] if contas_cliente else None),
             "conta_destino_id": parse_int(request.form.get("conta_destino_id")) if request.method == "POST" else (contas_proprias[0]["id"] if contas_proprias else None),
             "observacao": request.form.get("observacao", ""),
@@ -5819,7 +5793,7 @@ def resumo_financeiro_cliente(
     cliente_id: int,
 ) -> dict[str, int]:
     """Posição atual do cliente, com documentos em aberto por faixa."""
-    today = date.today()
+    today = hoje_brasil()
     today_iso = today.isoformat()
     month_end_iso = last_day_of_month(today).isoformat()
 
@@ -6154,7 +6128,7 @@ def conferencia_mensal_cliente(
             if pendente > 0:
                 agregado["contratos_pendentes"] += 1
 
-                if vencimento < date.today():
+                if vencimento < hoje_brasil():
                     agregado["pendente_vencido_centavos"] += pendente
                 else:
                     agregado["pendente_futuro_centavos"] += pendente
@@ -6173,7 +6147,7 @@ def conferencia_mensal_cliente(
                         "datas_pagamento": datas,
                         "situacao": (
                             "PENDENTE"
-                            if vencimento >= date.today()
+                            if vencimento >= hoje_brasil()
                             else (
                                 "SEM PAGAMENTO"
                                 if recebido == 0
@@ -6237,7 +6211,7 @@ def conferencia_mensal_cliente(
                 "AGUARDANDO"
                 if pendente_vencido == 0
                 and (
-                    competencia >= date.today().strftime("%Y-%m")
+                    competencia >= hoje_brasil().strftime("%Y-%m")
                     or pendente_futuro > 0
                 )
                 else "SEM RECEBIMENTO"

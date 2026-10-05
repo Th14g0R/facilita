@@ -162,6 +162,13 @@ class PostgresConnection:
                 self._pool = None
         else:
             self._conn = psycopg2.connect(uri)
+        if self._conn:
+            try:
+                with self._conn.cursor() as cur:
+                    cur.execute("SET TIME ZONE 'America/Fortaleza';")
+                self._conn.commit()
+            except Exception:
+                pass
         self.defer_commit = False
 
     def cursor(self):

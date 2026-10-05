@@ -1,9 +1,10 @@
 """Consultas do painel: principal, receita de juros e cartões separados."""
 from datetime import date, timedelta
+from timezone_utils import hoje_brasil
 
 
 def dashboard_data(db):
-    today = date.today()
+    today = hoje_brasil()
     end = today + timedelta(days=7)
     overdue = db.execute("""
         SELECT COALESCE(SUM(valor_previsto_centavos),0) AS valor, COUNT(*) AS quantidade

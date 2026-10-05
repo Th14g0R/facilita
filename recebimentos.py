@@ -2,6 +2,7 @@
 from datetime import date
 import json
 import sqlite3
+from timezone_utils import hoje_brasil
 
 from flask import abort, flash, g, redirect, render_template, request, url_for
 
@@ -97,7 +98,7 @@ def _form(core, cliente_id, date_name):
     own = core.get_own_accounts()
     accounts = core.get_client_accounts(cliente_id) if cliente_id else []
     data = dict(request.form)
-    data.setdefault(date_name,date.today().isoformat())
+    data.setdefault(date_name, hoje_brasil().isoformat())
     data.setdefault('conta_origem_id',accounts[0]['id'] if accounts else None)
     data.setdefault('conta_destino_id',own[0]['id'] if own else None)
     data.setdefault('observacao','')
@@ -334,7 +335,7 @@ def juros(emprestimo_id):
     db=core.get_db()
     loan=core.get_emprestimo_or_404(emprestimo_id)
     form,accounts,own=_form(core,loan['cliente_id'],'data_movimento')
-    form.setdefault('competencia',date.today().strftime('%Y-%m'))
+    form.setdefault('competencia', hoje_brasil().strftime('%Y-%m'))
     planos=[]
     try:
         competencia=core.parse_competencia(form['competencia'])

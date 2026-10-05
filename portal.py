@@ -6,6 +6,7 @@ import re
 import secrets
 import sqlite3
 from datetime import date, datetime, timedelta
+from timezone_utils import hoje_brasil, agora_brasil, iso_agora_brasil
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -485,7 +486,7 @@ def login():
             """,
             (login_val, login_val),
         ).fetchone()
-        now = datetime.now()
+        now = agora_brasil()
         blocked = False
         if row is not None and row['bloqueado_ate']:
             try:
@@ -562,7 +563,7 @@ def statement():
     cid = int(g.portal_access['cliente_id'])
     sync_receivable_titles(db)
 
-    today = date.today()
+    today = hoje_brasil()
 
     situacao = request.args.get('situacao', 'todos').strip().lower()
     periodo = request.args.get('periodo', 'ano_atual').strip().lower()
@@ -1074,7 +1075,7 @@ def new_access():
                 or bool(client_row['telefone'] and only_digits(client_row['telefone']) == phone)
             )
             senha_hash = generate_password_hash(senha)
-            approved_at = datetime.now().isoformat(sep=' ', timespec='seconds') if status == 'ATIVO' else None
+            approved_at = iso_agora_brasil() if status == 'ATIVO' else None
             approved_by = g.usuario['id'] if status == 'ATIVO' else None
 
             try:
@@ -1247,10 +1248,7 @@ def edit_access(aid):
             approved_at = access['aprovado_at']
             approved_by = access['aprovado_por_usuario_id']
             if status == 'ATIVO' and access['status'] != 'ATIVO':
-                approved_at = datetime.now().isoformat(
-                    sep=' ',
-                    timespec='seconds',
-                )
+                approved_at = iso_agora_brasil()
                 approved_by = g.usuario['id']
 
             try:

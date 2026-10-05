@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.1+build.1 — 2026-10-05
+
+- Padronização estrita de data e hora no fuso horário oficial de Fortaleza/CE/Brasil (`America/Fortaleza`, UTC-3) em toda a aplicação.
+- Correção de exibição na Auditoria: timestamps em UTC do banco agora são convertidos dinamicamente e com precisão para o horário local.
+- Proteção financeira contra cobrança indevida: `hoje_brasil()` substitui `date.today()` do servidor, impedindo que títulos vençam antes da meia-noite local e evitando juros de atraso calculados prematuramente.
+- Sincronização do fuso horário nas conexões PostgreSQL (`SET TIME ZONE 'America/Fortaleza'`).
+- Novo módulo central `timezone_utils.py` com cobertura completa de testes unitários.
+
 ## 2.2.0+build.1 — 2026-10-05
 
 - Transição completa para a identidade visual Facilita e redesign moderno (paleta inspirada em Conta Azul e Asaas com temas Claro e Escuro refinados).

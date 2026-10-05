@@ -3,6 +3,7 @@ from datetime import date
 import json
 import sqlite3
 from uuid import uuid4
+from timezone_utils import hoje_brasil
 
 from flask import abort, current_app, flash, g, redirect, render_template, request, url_for
 from atrasos import calcular, assinatura, totais, snapshot
@@ -22,7 +23,7 @@ def novo_comprovante():
             WHERE i.titulo_receber_id=t.id AND cp.status='EM_ANALISE')
         ORDER BY t.data_vencimento,t.id''',(cid,)).fetchall()
     available={t['id'] for t in titles}
-    form={'data_pagamento':request.form.get('data_pagamento',date.today().isoformat()),
+    form={'data_pagamento':request.form.get('data_pagamento', hoje_brasil().isoformat()),
           'observacao':request.form.get('observacao','')}
     planos=[]
     path=None
@@ -34,7 +35,7 @@ def novo_comprovante():
             rows=carregar(db,ids,cid)
             validar_titulos(db,rows)
             data=portal.parse_iso_date(form['data_pagamento'])
-            if data is None or data>date.today():
+            if data is None or data>hoje_brasil():
                 raise ValueError('Informe a data efetiva do pagamento, até hoje.')
             planos=[calcular(t,data) for t in rows]
             if request.form.get('acao')!='prever':

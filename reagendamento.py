@@ -3,6 +3,7 @@ import calendar
 from datetime import date
 import json
 import sqlite3
+from timezone_utils import hoje_brasil
 
 from atrasos import calcular, assinatura, totais, gravar_calculo
 
@@ -37,7 +38,7 @@ def incluir_futuros(db, plano, dia):
     limits={}
     for p in plano:
         eid=p['titulo']['emprestimo_id']
-        limits[eid]=max(limits.get(eid,date.today().isoformat()),p['titulo']['data_vencimento'])
+        limits[eid]=max(limits.get(eid, hoje_brasil().isoformat()),p['titulo']['data_vencimento'])
     following=[]
     for eid,limit in limits.items():
         rows=db.execute('''SELECT t.*, e.data_emprestimo, c.nome AS cliente_nome
