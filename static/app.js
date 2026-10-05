@@ -1,6 +1,66 @@
 'use strict';
 
 // ============================================================================
+// Alternador de Tema Claro e Escuro (Asaas & Conta Azul)
+// ============================================================================
+const THEME_STORAGE_KEY = 'facilita_theme';
+
+function getSystemTheme() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function getActiveTheme() {
+  return document.documentElement.getAttribute('data-theme') || getSystemTheme();
+}
+
+function updateThemeButtonState(btn, theme) {
+  if (!btn) return;
+  const isDark = theme === 'dark';
+  btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+  btn.setAttribute('title', isDark ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro');
+  const label = btn.querySelector('.theme-label');
+  if (label) {
+    label.textContent = isDark ? 'Modo Escuro' : 'Modo Claro';
+  }
+}
+
+function setTheme(theme) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch (e) {}
+
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('btnThemeToggle');
+  updateThemeButtonState(btn, theme);
+}
+
+function initTheme() {
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  const activeTheme = savedTheme || getSystemTheme();
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }
+
+  const btn = document.getElementById('btnThemeToggle');
+  if (btn) {
+    updateThemeButtonState(btn, activeTheme);
+    btn.addEventListener('click', () => {
+      const current = getActiveTheme();
+      const next = current === 'dark' ? 'light' : 'dark';
+      setTheme(next);
+    });
+  }
+
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem(THEME_STORAGE_KEY)) {
+        updateThemeButtonState(btn, e.matches ? 'dark' : 'light');
+      }
+    });
+  }
+}
+
+// ============================================================================
 // Modo Privacidade (Ocultar / Exibir Valores na Tela)
 // ============================================================================
 const PRIVACY_STORAGE_KEY = 'emprestimo_privacy_mode';
@@ -138,12 +198,30 @@ function protectMonetaryTextNodes() {
   });
 }
 
-// Inicializa o modo de privacidade quando o DOM estiver pronto
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initPrivacyMode);
-} else {
+// Inicializa o tema e o modo de privacidade quando o DOM estiver pronto
+function initApp() {
+  initTheme();
   initPrivacyMode();
 }
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
+
+// Atalho de teclado para alternar tema (Alt + T)
+document.addEventListener('keydown', (event) => {
+  if (event.altKey && (event.key === 't' || event.key === 'T')) {
+    const targetTag = event.target ? event.target.tagName : '';
+    if (targetTag !== 'INPUT' && targetTag !== 'TEXTAREA') {
+      event.preventDefault();
+      const current = getActiveTheme();
+      const next = current === 'dark' ? 'light' : 'dark';
+      setTheme(next);
+    }
+  }
+});
 
 // ============================================================================
 // Validações e Interações de Formulários

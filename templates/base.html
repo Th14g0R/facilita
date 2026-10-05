@@ -6,7 +6,8 @@
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static',filename='favicon.svg') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static',filename='favicon.svg') }}">
 <link rel="manifest" href="{{ url_for('static',filename='manifest.json') }}">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6f8">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c1421">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Facilita">
@@ -18,6 +19,10 @@
 <script src="{{ url_for('static',filename='app.js') }}?v={{ app_version }}" defer></script>
 <script>
   try {
+    const savedTheme = localStorage.getItem('facilita_theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
     if (localStorage.getItem('emprestimo_privacy_mode') === 'true') {
       document.documentElement.setAttribute('data-privacy-mode', 'true');
     }
@@ -48,8 +53,25 @@
 <span>{{ 'Portal do cliente' if portal_area else 'Gestão financeira e facilidades' }}</span>
 <span class="topbar-date">{{ hoje|date_br }}</span>
 </div>
-{% if g.usuario or g.portal_access %}
 <div class="topbar-actions">
+<button type="button" class="btn-theme-toggle" id="btnThemeToggle" aria-label="Alternar tema claro e escuro" title="Alternar tema claro / escuro">
+<svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+</svg>
+<svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+<circle cx="12" cy="12" r="5"></circle>
+<line x1="12" y1="1" x2="12" y2="3"></line>
+<line x1="12" y1="21" x2="12" y2="23"></line>
+<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+<line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+<line x1="1" y1="12" x2="3" y2="12"></line>
+<line x1="21" y1="12" x2="23" y2="12"></line>
+<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+<line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+</svg>
+<span class="theme-label">Tema</span>
+</button>
+{% if g.usuario or g.portal_access %}
 <button type="button" class="btn-privacy-toggle" id="btnPrivacyToggle" aria-label="Ocultar valores da tela" aria-pressed="false" title="Ocultar valores na tela (Modo Privacidade)">
 <svg class="icon-eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -61,8 +83,8 @@
 </svg>
 <span class="privacy-label">Ocultar valores</span>
 </button>
-</div>
 {% endif %}
+</div>
 </div>
 <div class="content">{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="alert {{ category }}" role="alert">{{ message }}</div>{% endfor %}{% endwith %}{% block content %}{% endblock %}</div>
 <footer class="version-footer">Facilita · v{{ app_version }}</footer>

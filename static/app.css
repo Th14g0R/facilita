@@ -1,48 +1,56 @@
-:root {
+/* ==========================================================================
+   Design Tokens - Padrão Financeiro Asaas & Conta Azul
+   ========================================================================== */
+:root,
+:root[data-theme="light"] {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  --bg: #f8fafc;
+  --bg: #f4f6f8;
   --surface: #ffffff;
-  --surface-raised: #f1f5f9;
-  --ink: #0f172a;
-  --ink-light: #1e293b;
-  --muted: #64748b;
-  --line: #e2e8f0;
-  --line-strong: #cbd5e1;
+  --surface-raised: #ebf0f5;
+  --surface-alt: #f0f4f9;
+  --surface-hover: #e4ebf3;
+  --ink: #172b4d;
+  --ink-light: #253858;
+  --muted: #5e6c84;
+  --line: #dfe1e6;
+  --line-strong: #c1c7d0;
 
-  --brand: #0d7a68;
-  --brand-hover: #085a4d;
-  --brand-dark: #06443a;
-  --brand-light: #e6f6f2;
-  --brand-focus: rgba(13, 122, 104, 0.2);
+  /* Identidade Corporativa Asaas & Conta Azul */
+  --brand: #0052cc;
+  --brand-hover: #0747a6;
+  --brand-dark: #003882;
+  --brand-light: #deebff;
+  --brand-focus: rgba(0, 82, 204, 0.22);
 
-  --red: #b91c1c;
-  --red-bg: #fee2e2;
-  --red-border: #fecaca;
-  --red-text: #991b1b;
+  /* Feedback Semântico / Status Financeiro */
+  --red: #de350b;
+  --red-bg: #ffebe6;
+  --red-border: #ffbdad;
+  --red-text: #bf2600;
 
-  --amber: #b45309;
-  --amber-bg: #fef3c7;
-  --amber-border: #fde68a;
-  --amber-text: #78350f;
+  --amber: #ff8b00;
+  --amber-bg: #fff8e1;
+  --amber-border: #ffe082;
+  --amber-text: #995200;
 
-  --green: #047857;
-  --green-bg: #d1fae5;
-  --green-border: #a7f3d0;
-  --green-text: #065f46;
+  --green: #00875a;
+  --green-bg: #e3fcef;
+  --green-border: #abf5d1;
+  --green-text: #006644;
 
-  --blue: #1d4ed8;
-  --blue-bg: #e0f2fe;
-  --blue-border: #bae6fd;
-  --blue-text: #0369a1;
+  --blue: #0052cc;
+  --blue-bg: #deebff;
+  --blue-border: #b3d4ff;
+  --blue-text: #0747a6;
 
   --radius-sm: 6px;
   --radius: 12px;
   --radius-lg: 16px;
 
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-xs: 0 1px 2px rgba(9, 30, 66, 0.05);
+  --shadow-sm: 0 1px 3px rgba(9, 30, 66, 0.08), 0 1px 2px rgba(9, 30, 66, 0.04);
+  --shadow: 0 4px 10px -2px rgba(9, 30, 66, 0.1), 0 2px 4px -1px rgba(9, 30, 66, 0.06);
+  --shadow-md: 0 12px 20px -4px rgba(9, 30, 66, 0.12), 0 4px 8px -2px rgba(9, 30, 66, 0.06);
 
   font-family: var(--font-sans);
   color: var(--ink);
@@ -53,48 +61,95 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Modo Escuro (Ativado via prefers-color-scheme sem data-theme=light, ou data-theme=dark) */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1120;
-    --surface: #1e293b;
-    --surface-raised: #334155;
-    --ink: #f8fafc;
-    --ink-light: #f1f5f9;
-    --muted: #94a3b8;
-    --line: #334155;
-    --line-strong: #475569;
+  :root:not([data-theme="light"]) {
+    --bg: #0c1421;
+    --surface: #141f33;
+    --surface-raised: #1c2b44;
+    --surface-alt: #18253b;
+    --surface-hover: #223654;
+    --ink: #f4f6fa;
+    --ink-light: #e6ebf2;
+    --muted: #8fa2bd;
+    --line: #22344f;
+    --line-strong: #334d73;
 
-    --brand: #10b981;
-    --brand-hover: #34d399;
-    --brand-dark: #059669;
-    --brand-light: rgba(16, 185, 129, 0.12);
-    --brand-focus: rgba(16, 185, 129, 0.3);
+    --brand: #2684ff;
+    --brand-hover: #4c9aff;
+    --brand-dark: #0052cc;
+    --brand-light: rgba(38, 132, 255, 0.16);
+    --brand-focus: rgba(38, 132, 255, 0.3);
 
-    --red: #ef4444;
-    --red-bg: rgba(239, 68, 68, 0.15);
-    --red-border: rgba(239, 68, 68, 0.3);
-    --red-text: #fca5a5;
+    --red: #ff5630;
+    --red-bg: rgba(255, 86, 48, 0.18);
+    --red-border: rgba(255, 86, 48, 0.34);
+    --red-text: #ff8f73;
 
-    --amber: #f59e0b;
-    --amber-bg: rgba(245, 158, 11, 0.15);
-    --amber-border: rgba(245, 158, 11, 0.3);
-    --amber-text: #fde68a;
+    --amber: #ffab00;
+    --amber-bg: rgba(255, 171, 0, 0.16);
+    --amber-border: rgba(255, 171, 0, 0.32);
+    --amber-text: #ffe380;
 
-    --green: #10b981;
-    --green-bg: rgba(16, 185, 129, 0.15);
-    --green-border: rgba(16, 185, 129, 0.3);
-    --green-text: #6ee7b7;
+    --green: #36b37e;
+    --green-bg: rgba(54, 179, 126, 0.16);
+    --green-border: rgba(54, 179, 126, 0.32);
+    --green-text: #79f2c0;
 
-    --blue: #38bdf8;
-    --blue-bg: rgba(56, 189, 248, 0.15);
-    --blue-border: rgba(56, 189, 248, 0.3);
-    --blue-text: #bae6fd;
+    --blue: #4c9aff;
+    --blue-bg: rgba(76, 154, 255, 0.16);
+    --blue-border: rgba(76, 154, 255, 0.32);
+    --blue-text: #b3d4ff;
 
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.6);
+    --shadow-md: 0 12px 20px -4px rgba(0, 0, 0, 0.7);
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0c1421;
+  --surface: #141f33;
+  --surface-raised: #1c2b44;
+  --surface-alt: #18253b;
+  --surface-hover: #223654;
+  --ink: #f4f6fa;
+  --ink-light: #e6ebf2;
+  --muted: #8fa2bd;
+  --line: #22344f;
+  --line-strong: #334d73;
+
+  --brand: #2684ff;
+  --brand-hover: #4c9aff;
+  --brand-dark: #0052cc;
+  --brand-light: rgba(38, 132, 255, 0.16);
+  --brand-focus: rgba(38, 132, 255, 0.3);
+
+  --red: #ff5630;
+  --red-bg: rgba(255, 86, 48, 0.18);
+  --red-border: rgba(255, 86, 48, 0.34);
+  --red-text: #ff8f73;
+
+  --amber: #ffab00;
+  --amber-bg: rgba(255, 171, 0, 0.16);
+  --amber-border: rgba(255, 171, 0, 0.32);
+  --amber-text: #ffe380;
+
+  --green: #36b37e;
+  --green-bg: rgba(54, 179, 126, 0.16);
+  --green-border: rgba(54, 179, 126, 0.32);
+  --green-text: #79f2c0;
+
+  --blue: #4c9aff;
+  --blue-bg: rgba(76, 154, 255, 0.16);
+  --blue-border: rgba(76, 154, 255, 0.32);
+  --blue-text: #b3d4ff;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 12px 20px -4px rgba(0, 0, 0, 0.7);
 }
 
 * { box-sizing: border-box; }
@@ -242,7 +297,65 @@ small, .muted { color: var(--muted); }
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+/* Botão de Alternância de Tema (Sol / Lua) */
+.btn-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 550;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.btn-theme-toggle:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.btn-theme-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.btn-theme-toggle svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+/* Ícones de Sol / Lua sincronizados com o tema ativo */
+.btn-theme-toggle .icon-sun {
+  display: none;
+}
+.btn-theme-toggle .icon-moon {
+  display: inline-block;
+}
+
+:root[data-theme="dark"] .btn-theme-toggle .icon-sun {
+  display: inline-block;
+}
+:root[data-theme="dark"] .btn-theme-toggle .icon-moon {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn-theme-toggle .icon-sun {
+    display: inline-block;
+  }
+  :root:not([data-theme="light"]) .btn-theme-toggle .icon-moon {
+    display: none;
+  }
 }
 
 /* Botão de Alternância do Modo Privacidade */
@@ -254,7 +367,7 @@ small, .muted { color: var(--muted); }
   background: var(--surface-alt);
   border: 1px solid var(--line);
   border-radius: 9999px;
-  color: var(--text-subtle);
+  color: var(--muted);
   font-size: 12.5px;
   font-weight: 500;
   font-family: inherit;
@@ -265,7 +378,7 @@ small, .muted { color: var(--muted); }
 
 .btn-privacy-toggle:hover {
   background: var(--surface-hover);
-  color: var(--text);
+  color: var(--ink);
   border-color: var(--line-strong);
 }
 
@@ -491,15 +604,15 @@ small, .muted { color: var(--muted); }
 .metric small { font-size: 12px; color: var(--muted); }
 
 .metric.featured {
-  background: linear-gradient(135deg, var(--brand-dark), #0b3d35);
+  background: linear-gradient(135deg, var(--brand-dark), var(--brand));
   color: #fff;
   border-color: var(--brand-dark);
-  box-shadow: 0 4px 12px rgba(6, 68, 58, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 56, 130, 0.28);
 }
 .metric.featured strong { color: #ffffff; }
-.metric.featured span { color: #a7f3d0; }
-.metric.featured small { color: #d1fae5; }
-.metric.featured:hover { border-color: var(--brand); transform: translateY(-2px); }
+.metric.featured span { color: #deebff; }
+.metric.featured small { color: #b3d4ff; }
+.metric.featured:hover { border-color: var(--brand-hover); transform: translateY(-2px); }
 
 .metric.overdue strong { color: var(--red); }
 
@@ -548,18 +661,21 @@ tbody tr:hover { background: var(--surface-raised); }
   font-weight: 600;
 }
 
-/* Badges e Status com Contraste WCAG AA */
+/* Badges e Status Estilo Soft Pill (Asaas & Conta Azul) */
 .badge {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 650;
-  border-radius: 6px;
-  padding: 3px 8px;
+  border-radius: 9999px;
+  padding: 3px 10px;
   background: var(--surface-raised);
   color: var(--muted);
   white-space: nowrap;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   line-height: 1.4;
   border: 1px solid var(--line);
+  letter-spacing: 0.2px;
 }
 
 .badge.vencido, .badge.rejeitado {
@@ -962,7 +1078,9 @@ td:last-child { overflow-wrap: anywhere; max-width: 500px; }
   .topbar { height: 50px; padding: 0 16px; font-size: 12px; }
   .topbar-info { gap: 8px; }
   .topbar-date { display: none; }
+  .btn-theme-toggle .theme-label,
   .btn-privacy-toggle .privacy-label { display: none; }
+  .btn-theme-toggle,
   .btn-privacy-toggle { padding: 6px 10px; border-radius: 8px; min-height: 34px; }
   .content { padding: 18px 14px 48px; }
   .page-heading { align-items: flex-start; flex-direction: column; gap: 14px; margin-bottom: 20px; }
