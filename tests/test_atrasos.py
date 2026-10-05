@@ -386,6 +386,25 @@ class AtrasoHTTPTests(unittest.TestCase):
         self.assertEqual(mov['juros_atraso_centavos'], 12000)
         self.assertIn('acordados', mov['observacao'])
 
+    def test_pagamento_agrupado_com_juros_especifico(self):
+        # Tela do menu Recebimentos (/pagamentos-integrados/novo)
+        data = dict(cliente_id='1', titulo_id=[str(self.tid)], data_pagamento=self.today.isoformat(),
+                    conta_origem_id='2', conta_destino_id='1',
+                    juros_especifico='150,00', tipo_ajuste_atraso='juros_especifico')
+        preview = self.c.post('/pagamentos-integrados/novo', acao='prever', **data)
+        html = preview.get_data(as_text=True)
+        self.assertIn('Recalcular juros', html)
+        self.assertIn('Definir juros de atraso a cobrar', html)
+        token = self.token(preview)
+
+        response = self.c.post('/pagamentos-integrados/novo', acao='confirmar', assinatura=token,
+                               valor_total='950,00', **{f'valor_titulo_{self.tid}': '950,00', **data})
+        self.assertEqual(response.status_code, 302)
+        row = self.row()
+        self.assertEqual(row['status'], 'RECEBIDO')
+        self.assertEqual(row['valor_recebido_centavos'], 95000)
+        self.assertEqual(row['juros_atraso_centavos'], 15000)
+
 
 class UpgradeTests(unittest.TestCase):
     def test_banco_da_versao_original_preservado(self):

@@ -229,18 +229,59 @@ def novo():
             rows=carregar(db,selected,cid)
             validar_titulos(db,rows)
             data=core.parse_iso_date(form['data_pagamento'])
+            tipo_ajuste = form.get('tipo_ajuste_atraso', '').strip()
             abonar_geral = form.get('abonar_atraso') in ('1', 'true', 'on', 'sim')
+            juros_esp_geral_str = form.get('juros_especifico', '').strip()
+            desc_geral_str = form.get('desconto_atraso', '').strip()
+
+            if request.form.get('acao') == 'restaurar_calculo':
+                abonar_geral = False
+                juros_esp_geral_str = ''
+                desc_geral_str = ''
+                tipo_ajuste = ''
+
+            juros_esp_geral = core.parse_money_to_centavos(juros_esp_geral_str) if juros_esp_geral_str else None
+            desc_geral = core.parse_money_to_centavos(desc_geral_str) if desc_geral_str else 0
+
+            # Pré-cálculo para identificar o adicional original de atraso
+            planos_puros = [calcular(t, data) for t in rows]
+            total_juros_calc = sum(p['juros_atraso_calculado_centavos'] for p in planos_puros)
+            qtd_com_atraso = sum(1 for p in planos_puros if p['juros_atraso_calculado_centavos'] > 0)
+
             planos = []
-            for t in rows:
+            for t, puro in zip(rows, planos_puros):
                 abonar_item = abonar_geral or (form.get(f"abonar_atraso_{t['id']}") in ('1', 'true', 'on', 'sim'))
                 juros_esp_str = form.get(f"juros_especifico_{t['id']}", '').strip()
                 desc_str = form.get(f"desconto_atraso_{t['id']}", '').strip()
-                juros_esp_centavos = core.parse_money_to_centavos(juros_esp_str) if juros_esp_str else None
-                desc_centavos = core.parse_money_to_centavos(desc_str) if desc_str else 0
+                juros_esp_item = core.parse_money_to_centavos(juros_esp_str) if juros_esp_str else None
+                desc_item = core.parse_money_to_centavos(desc_str) if desc_str else 0
+
+                # Aplica as condições do painel geral quando não houver especificação individual por título
+                if juros_esp_item is None and desc_item == 0 and not abonar_item:
+                    if qtd_com_atraso == 1 and puro['juros_atraso_calculado_centavos'] > 0:
+                        if abonar_geral:
+                            abonar_item = True
+                        elif tipo_ajuste == 'juros_especifico' or (juros_esp_geral is not None and not desc_geral_str):
+                            juros_esp_item = juros_esp_geral
+                        elif tipo_ajuste == 'desconto' or (desc_geral > 0 and not juros_esp_geral_str):
+                            desc_item = desc_geral
+                        elif juros_esp_geral is not None:
+                            juros_esp_item = juros_esp_geral
+                        elif desc_geral > 0:
+                            desc_item = desc_geral
+                    elif total_juros_calc > 0 and puro['juros_atraso_calculado_centavos'] > 0:
+                        fracao = puro['juros_atraso_calculado_centavos'] / total_juros_calc
+                        if tipo_ajuste == 'juros_especifico' and juros_esp_geral is not None:
+                            desc_total = max(0, total_juros_calc - juros_esp_geral)
+                            desc_item = int(round(desc_total * fracao))
+                        elif desc_geral > 0:
+                            desc_item = int(round(desc_geral * fracao))
+
                 planos.append(calcular(t, data, abonar_atraso=abonar_item,
-                                       desconto_atraso_centavos=desc_centavos,
-                                       juros_especifico_centavos=juros_esp_centavos))
-            if request.form.get('acao')!='prever':
+                                       desconto_atraso_centavos=desc_item,
+                                       juros_especifico_centavos=juros_esp_item))
+
+            if request.form.get('acao') not in ('prever', 'restaurar_calculo'):
                 _check_preview(planos)
                 supplied=request.form.get('valor_total')
                 if supplied and core.parse_money_to_centavos(supplied)!=totais(planos)['valor_total_centavos']:
@@ -253,7 +294,13 @@ def novo():
                 resumo = totais(planos)
                 if resumo.get('desconto_atraso_centavos', 0) > 0:
                     desc_fmt = core.format_money(resumo['desconto_atraso_centavos'])
-                    nota_abono = f"[Abono/desconto de atraso: {desc_fmt}]"
+                    juros_cob_fmt = core.format_money(resumo['juros_atraso_centavos'])
+                    if resumo['juros_atraso_centavos'] == 0:
+                        nota_abono = f"[Juros de atraso abonados: {desc_fmt}]"
+                    elif tipo_ajuste == 'juros_especifico' or juros_esp_geral is not None:
+                        nota_abono = f"[Juros de atraso acordados: {juros_cob_fmt} (desconto de {desc_fmt})]"
+                    else:
+                        nota_abono = f"[Desconto em juros de atraso: {desc_fmt} (juros cobrados: {juros_cob_fmt})]"
                     obs = f"{obs} {nota_abono}".strip() if obs else nota_abono
                 payid,_=registrar(db,rows,data,core.parse_int(form['conta_origem_id']),
                     core.parse_int(form['conta_destino_id']),obs,agrupado=True,planos=planos)
@@ -267,6 +314,15 @@ def novo():
         db.rollback()
         core.app.logger.exception('Erro ao registrar recebimento agrupado')
         flash('O pagamento não foi gravado. Confira os títulos antes de tentar novamente.','danger')
+    if planos:
+        resumo = totais(planos)
+        form['abonar_atraso'] = '1' if (resumo['tem_abono'] and resumo['juros_atraso_centavos'] == 0 and resumo['juros_atraso_calculado_centavos'] > 0) else ''
+        if resumo.get('juros_atraso_calculado_centavos', 0) > 0:
+            form['juros_especifico'] = core.format_money(resumo['juros_atraso_centavos']).replace('R$ ','')
+            if resumo.get('desconto_atraso_centavos') and not form['abonar_atraso']:
+                form['desconto_atraso'] = core.format_money(resumo['desconto_atraso_centavos']).replace('R$ ','')
+            elif not form['abonar_atraso']:
+                form['desconto_atraso'] = ''
     return render_template('pagamentos_integrados/form.html',clientes=clientes,cliente=cliente,
         form=form,titulos_abertos=titles,selected_title_ids=selected,contas_cliente=accounts,
         contas_proprias=own,planos=planos,resumo_atraso=totais(planos),assinatura=assinatura(planos))
