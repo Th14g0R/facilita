@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS clientes_acessos (
     observacao_admin TEXT,
     reset_token TEXT,
     reset_token_expira TEXT,
+    foto_perfil TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -229,6 +230,7 @@ CREATE TABLE IF NOT EXISTS comprovantes_pagamento (
     status TEXT NOT NULL DEFAULT 'EM_ANALISE' CHECK (status IN ('EM_ANALISE','CONFIRMADO','REJEITADO')),
     observacao_cliente TEXT,
     observacao_admin TEXT,
+    arquivo_base64 TEXT,
     pagamento_integrado_id INTEGER REFERENCES pagamentos_integrados(id) ON UPDATE CASCADE ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     analisado_at TEXT,

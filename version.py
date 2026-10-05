@@ -1,2 +1,2 @@
 """Identificação pública da versão instalada."""
-APP_VERSION = "2.4.1"
+APP_VERSION = "2.4.2"

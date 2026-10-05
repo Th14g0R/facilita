@@ -158,10 +158,14 @@
 <div class="sidebar-footer">
   <div class="user-profile-bar">
     <div class="user-avatar-icon">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-        <circle cx="12" cy="7" r="4"></circle>
-      </svg>
+      {% if portal_area and g.portal_access and g.portal_access.foto_perfil %}
+        <img src="{{ g.portal_access.foto_perfil }}" alt="Foto de perfil" class="user-avatar-img">
+      {% else %}
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      {% endif %}
     </div>
     <div class="user-meta">
       <strong class="user-name" title="{{ g.portal_access.cliente_nome if portal_area and g.portal_access else g.usuario.nome }}">

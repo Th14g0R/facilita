@@ -1,6 +1,6 @@
 # Facilita — versão 2
 
-Versão **2.4.1**, mantida na branch **main**.
+Versão **2.4.2**, mantida na branch **main**.
 Sistema de uso real para empréstimos pessoais, recebimentos e cartão de crédito,
 com interface administrativa e portal do cliente. Não inclui dados demonstrativos
 nem usuário ou senha padrão.

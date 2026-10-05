@@ -1,34 +1,188 @@
-{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}Meu extrato{% endblock %}{% block content %}<header class="page-heading">
-<div>
-<p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>Meu extrato</h1>
-</div>
-<div class="actions">
-</div>
+{% extends 'base.html' %}
+{% from '_macros.html' import field, select, table with context %}
+{% block title %}Meu extrato{% endblock %}
+
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">CONTROLE FINANCEIRO</p>
+    <h1>Meu extrato</h1>
+  </div>
+  <div class="actions">
+  </div>
 </header>
+
 <section class="panel">
-<form method="get" class="filters">
-<label class="field">
-<span>Contrato</span>
-<select name="contrato_id">
-<option value="">Todos os contratos</option>{% for c in contratos %}<option value="{{ c.id }}" {% if contrato_id==c.id %}selected{% endif %}>#{{ c.id }} · {{ c.descricao or 'Operação' }}</option>{% endfor %}</select>
-</label>
-<label class="field">
-<span>Período</span>
-<select name="periodo">{% for value,label in [('mes_atual','Mês atual'),('ano_atual','Ano atual'),('ano','Selecionar ano'),('personalizado','Datas abaixo'),('completo','Todo o histórico')] %}<option value="{{ value }}" {% if periodo==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-</label>
-<label class="field">
-<span>Ano</span>
-<select name="ano">{% for a in anos %}<option value="{{ a }}" {% if ano==a %}selected{% endif %}>{{ a }}</option>{% endfor %}</select>
-</label>
-<label class="field">
-<span>Situação</span>
-<select name="situacao">{% for value,label in [('todos','Todas'),('abertos','Em aberto'),('atrasados','Vencidos'),('pagos','Pagos'),('parciais','Parciais históricos')] %}<option value="{{ value }}" {% if situacao==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-</label>
-<label class="field">
-<span>Movimento</span>
-<select name="tipo_movimento">{% for value,label in [('TODOS','Todos'),('JUROS','Taxa de Serviço'),('ABATIMENTO','Amortização'),('QUITACAO','Liquidação'),('EMPRESTIMO','Aporte / Liberação')] %}<option value="{{ value }}" {% if tipo_movimento==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-</label>{{ field('data_inicio','De',data_inicio,type='date') }}{{ field('data_fim','Até',data_fim,type='date') }}<button class="button">Filtrar</button>
-</form>
-<h2>Títulos</h2>{{ table(titulos,[('emprestimo_id','Contrato'),('competencia','Competência'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')]) }}<h2>Movimentações</h2>{{ table(movimentos,[('data_movimento','Data'),('emprestimo_id','Contrato'),('tipo','Tipo'),('valor_centavos','Valor')]) }}</section>{% endblock %}
+  <!-- Filtros -->
+  <form method="get" class="filters">
+    <label class="field">
+      <span>Contrato</span>
+      <select name="contrato_id">
+        <option value="">Todos os contratos</option>
+        {% for c in contratos %}
+          <option value="{{ c.id }}" {% if contrato_id==c.id %}selected{% endif %}>#{{ c.id }} · {{ c.descricao or 'Operação' }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Período</span>
+      <select name="periodo">
+        {% for value,label in [('mes_atual','Mês atual'),('ano_atual','Ano atual'),('ano','Selecionar ano'),('personalizado','Datas abaixo'),('completo','Todo o histórico')] %}
+          <option value="{{ value }}" {% if periodo==value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Ano</span>
+      <select name="ano">
+        {% for a in anos %}
+          <option value="{{ a }}" {% if ano==a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Situação</span>
+      <select name="situacao">
+        {% for value,label in [('todos','Todas'),('abertos','Em aberto'),('atrasados','Vencidos'),('pagos','Pagos'),('parciais','Parciais históricos')] %}
+          <option value="{{ value }}" {% if situacao==value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Movimento</span>
+      <select name="tipo_movimento">
+        {% for value,label in [('TODOS','Todos'),('JUROS','Taxa de Serviço'),('ABATIMENTO','Amortização'),('QUITACAO','Liquidação'),('EMPRESTIMO','Aporte / Liberação')] %}
+          <option value="{{ value }}" {% if tipo_movimento==value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    {{ field('data_inicio','De',data_inicio,type='date') }}
+    {{ field('data_fim','Até',data_fim,type='date') }}
+    <button class="button">Filtrar</button>
+  </form>
+
+  <!-- Resumo Visual de Fluxo Financeiro do Período -->
+  <div class="extrato-summary-grid">
+    <div class="extrato-summary-card card-recebido">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Total Recebido (Aportes)</span>
+        <strong class="extrato-summary-val valor-recebido money">+ {{ resumo.credito_recebido_periodo_centavos|money }}</strong>
+      </div>
+    </div>
+
+    <div class="extrato-summary-card card-pago">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="19" x2="12" y2="5"></line>
+          <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Total Pago ao Facilita</span>
+        <strong class="extrato-summary-val valor-pago money">- {{ resumo.total_pago_periodo_centavos|money }}</strong>
+      </div>
+    </div>
+
+    <div class="extrato-summary-card card-aberto">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Títulos em Aberto</span>
+        <strong class="extrato-summary-val money">{{ resumo.total_aberto_centavos|money }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Seção de Títulos -->
+  <h2 style="margin-top: 28px;">Títulos</h2>
+  {{ table(titulos,[('emprestimo_id','Contrato'),('competencia','Competência'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')]) }}
+
+  <!-- Seção de Movimentações com Cores e Sinais Claros de Fluxo -->
+  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 36px; margin-bottom: 12px;">
+    <h2 style="margin: 0;">Movimentações</h2>
+    <div style="display: flex; gap: 14px; font-size: 12px;">
+      <span style="display: inline-flex; align-items: center; gap: 5px;">
+        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #059669;"></span>
+        <strong style="color: #059669;">(+) Recebido pelo cliente</strong>
+      </span>
+      <span style="display: inline-flex; align-items: center; gap: 5px;">
+        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #dc2626;"></span>
+        <strong style="color: #dc2626;">(-) Pago ao Facilita</strong>
+      </span>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Data</th>
+          <th scope="col">Contrato</th>
+          <th scope="col">Tipo de Operação</th>
+          <th scope="col">Fluxo Financeiro</th>
+          <th scope="col" class="money" style="text-align: right;">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in movimentos %}
+          <tr>
+            <td>{{ m.data_movimento|date_br }}</td>
+            <td style="font-weight: 500;">
+              #{{ m.emprestimo_id }}
+              {% if m.emprestimo_descricao %}
+                <span class="muted" style="font-size: 12px; margin-left: 4px;">({{ m.emprestimo_descricao }})</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge {{ m.tipo|lower }}">
+                {{ m.tipo|tipo_label }}
+              </span>
+            </td>
+            <td>
+              {% if m.tipo == 'EMPRESTIMO' %}
+                <span class="fluxo-badge fluxo-recebido" title="Valor creditado/recebido pelo cliente">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  Recebido pelo cliente
+                </span>
+              {% else %}
+                <span class="fluxo-badge fluxo-pago" title="Valor pago pelo cliente ao Facilita">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="17 14 12 9 7 14"></polyline><line x1="12" y1="21" x2="12" y2="9"></line></svg>
+                  Pago ao Facilita
+                </span>
+              {% endif %}
+            </td>
+            <td class="money" style="text-align: right;">
+              {% if m.tipo == 'EMPRESTIMO' %}
+                <strong class="valor-recebido">+ {{ m.valor_centavos|money }}</strong>
+              {% else %}
+                <strong class="valor-pago">- {{ m.valor_centavos|money }}</strong>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="5">
+              <div class="empty">Nenhuma movimentação encontrada para o período filtrado.</div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

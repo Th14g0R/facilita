@@ -49,12 +49,21 @@ def novo_comprovante():
                     raise ValueError('Anexe o comprovante de transferência.')
                 raw,ext,mime,original=portal.validate_file(storage)
                 name=f'{uuid4().hex}{ext}'
-                path=portal.PROOFS_DIR/name
-                path.write_bytes(raw)
+                path = None
+                try:
+                    portal.PROOFS_DIR.mkdir(parents=True, exist_ok=True)
+                    target_path = portal.PROOFS_DIR / name
+                    target_path.write_bytes(raw)
+                    path = target_path
+                except OSError:
+                    path = None
+                import base64
+                b64_data = base64.b64encode(raw).decode('ascii')
                 pid=_insert(db,'comprovantes_pagamento',dict(cliente_id=cid,
                     cliente_acesso_id=g.portal_access['id'],data_pagamento=data.isoformat(),
                     valor_total_centavos=totais(planos)['valor_total_centavos'],arquivo_nome=name,
                     arquivo_original=original,mime_type=mime,tamanho_bytes=len(raw),
+                    arquivo_base64=b64_data,
                     status='EM_ANALISE',observacao_cliente=form['observacao'].strip() or None))
                 for p in planos:
                     _insert(db,'comprovantes_pagamento_itens',dict(comprovante_id=pid,

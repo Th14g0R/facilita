@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% from '_macros.html' import csrf with context %}
 {% block title %}Meu Perfil{% endblock %}
+
 {% block content %}
 <header class="page-heading">
   <div>
@@ -9,59 +10,160 @@
   </div>
 </header>
 
-<div class="panel" style="max-width: 580px;">
-  <h2>Meus Dados de Acesso</h2>
-  <p class="muted" style="margin-bottom: 20px;">Confira suas informações cadastrais e gerencie sua senha de acesso ao portal.</p>
+<div style="display: flex; flex-direction: column; gap: 24px; max-width: 620px;">
 
-  <form method="post" action="{{ url_for('portal.perfil') }}">
-    {{ csrf() }}
-    
-    <label class="field">
-      <span>Nome</span>
-      <input type="text" value="{{ cliente.nome }}" disabled style="opacity: 0.7; cursor: not-allowed;">
-    </label>
+  <!-- Card: Foto de Perfil -->
+  <div class="panel">
+    <h2>Foto do Perfil</h2>
+    <p class="muted" style="margin-bottom: 20px;">Sua foto será exibida ao lado do seu nome no menu suspenso e na barra de navegação.</p>
 
-    <label class="field">
-      <span>CPF</span>
-      <input type="text" value="{{ cliente.cpf }}" disabled style="opacity: 0.7; cursor: not-allowed;">
-    </label>
+    <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+      <!-- Avatar Atual / Preview -->
+      <div class="profile-avatar-large-container">
+        {% if acesso.foto_perfil %}
+          <img id="avatarPreview" src="{{ acesso.foto_perfil }}" alt="Foto do perfil de {{ cliente.nome }}" class="profile-avatar-large-img">
+        {% else %}
+          <div id="avatarFallback" class="profile-avatar-large-fallback">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <img id="avatarPreview" src="" alt="Prévia da foto" class="profile-avatar-large-img" style="display: none;">
+        {% endif %}
+      </div>
 
-    <label class="field">
-      <span>E-mail cadastrado</span>
-      <input type="email" value="{{ acesso.email or '—' }}" disabled style="opacity: 0.7; cursor: not-allowed;">
-    </label>
+      <div style="flex: 1; min-width: 240px;">
+        <form method="post" action="{{ url_for('portal.perfil') }}" enctype="multipart/form-data">
+          {{ csrf() }}
+          <input type="hidden" name="action" value="salvar_foto">
 
-    <label class="field">
-      <span>Telefone</span>
-      <input type="text" value="{{ acesso.telefone_informado or cliente.telefone or '—' }}" disabled style="opacity: 0.7; cursor: not-allowed;">
-    </label>
+          <label class="field" style="margin-bottom: 10px;">
+            <span style="font-weight: 600;">Selecione uma imagem</span>
+            <input type="file" id="inputFoto" name="foto" accept="image/png, image/jpeg, image/jpg, image/webp" required>
+          </label>
 
-    <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+          <p class="muted" style="font-size: 12px; margin: 0 0 12px; line-height: 1.4;">
+            <strong>Limite:</strong> Máximo de 1024 KB (1 MB).<br>
+            Fotos grandes (mesmo em alta definição ou 4K) são recortadas e compactadas automaticamente em formato quadrado para não consumir espaço.
+          </p>
 
-    <h3 style="font-size: 16px; margin-bottom: 12px;">Alterar Senha do Portal</h3>
-    <p class="muted" style="font-size: 13px; margin-bottom: 16px;">Para alterar sua senha, preencha os campos abaixo e informe sua senha atual.</p>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button type="submit" class="button primary" style="font-size: 13px;">Salvar foto</button>
+            {% if acesso.foto_perfil %}
+              <button type="button" class="button danger" id="btnRemoverFoto" style="font-size: 13px;">Remover foto</button>
+            {% endif %}
+          </div>
+        </form>
 
-    <label class="field">
-      <span>Nova senha</span>
-      <input type="password" name="nova_senha" autocomplete="new-password" placeholder="Mínimo de 6 caracteres">
-    </label>
+        {% if acesso.foto_perfil %}
+          <form id="formRemoverFoto" method="post" action="{{ url_for('portal.perfil') }}" style="display: none;">
+            {{ csrf() }}
+            <input type="hidden" name="action" value="remover_foto">
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 
-    <label class="field">
-      <span>Confirmar nova senha</span>
-      <input type="password" name="confirmacao_senha" autocomplete="new-password" placeholder="Repita a nova senha">
-    </label>
+  <!-- Card: Dados Cadastrais e Alteração de Senha -->
+  <div class="panel">
+    <h2>Meus Dados de Acesso</h2>
+    <p class="muted" style="margin-bottom: 20px;">Confira suas informações cadastrais e gerencie sua senha de acesso ao portal.</p>
 
-    <div style="background: var(--surface-hover); padding: 14px 16px; border-radius: var(--radius); margin: 20px 0 24px; border: 1px solid var(--border);">
-      <label class="field" style="margin-bottom: 0;">
-        <span style="font-weight: 600; color: var(--text);">Confirmação: Sua senha atual</span>
-        <input type="password" name="senha_atual" autocomplete="current-password" placeholder="Digite sua senha atual caso vá alterar">
+    <form method="post" action="{{ url_for('portal.perfil') }}">
+      {{ csrf() }}
+
+      <label class="field">
+        <span>Nome completo</span>
+        <input type="text" value="{{ cliente.nome }}" disabled style="opacity: 0.7; cursor: not-allowed;">
       </label>
-    </div>
 
-    <div style="display: flex; gap: 12px; align-items: center;">
-      <button type="submit" class="button primary">Salvar senha</button>
-      <a href="{{ url_for('portal.dashboard') }}" class="button">Voltar</a>
-    </div>
-  </form>
+      <label class="field">
+        <span>CPF</span>
+        <input type="text" value="{{ cliente.cpf }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+      </label>
+
+      <label class="field">
+        <span>E-mail cadastrado</span>
+        <input type="email" value="{{ acesso.email or '—' }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+      </label>
+
+      <label class="field">
+        <span>Telefone</span>
+        <input type="text" value="{{ acesso.telefone_informado or cliente.telefone or '—' }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+      </label>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+
+      <h3 style="font-size: 16px; margin-bottom: 12px;">Alterar Senha do Portal</h3>
+      <p class="muted" style="font-size: 13px; margin-bottom: 16px;">Para alterar sua senha, preencha os campos abaixo e informe sua senha atual.</p>
+
+      <label class="field">
+        <span>Nova senha</span>
+        <input type="password" name="nova_senha" autocomplete="new-password" placeholder="Mínimo de 6 caracteres">
+      </label>
+
+      <label class="field">
+        <span>Confirmar nova senha</span>
+        <input type="password" name="confirmacao_senha" autocomplete="new-password" placeholder="Repita a nova senha">
+      </label>
+
+      <div style="background: var(--surface-hover); padding: 14px 16px; border-radius: var(--radius); margin: 20px 0 24px; border: 1px solid var(--border);">
+        <label class="field" style="margin-bottom: 0;">
+          <span style="font-weight: 600; color: var(--text);">Confirmação: Sua senha atual</span>
+          <input type="password" name="senha_atual" autocomplete="current-password" placeholder="Digite sua senha atual caso vá alterar">
+        </label>
+      </div>
+
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <button type="submit" class="button primary">Salvar nova senha</button>
+        <a href="{{ url_for('portal.dashboard') }}" class="button" style="text-decoration: none;">Voltar</a>
+      </div>
+    </form>
+  </div>
+
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const inputFoto = document.getElementById('inputFoto');
+  const avatarPreview = document.getElementById('avatarPreview');
+  const avatarFallback = document.getElementById('avatarFallback');
+  const btnRemoverFoto = document.getElementById('btnRemoverFoto');
+  const formRemoverFoto = document.getElementById('formRemoverFoto');
+
+  if (inputFoto) {
+    inputFoto.addEventListener('change', function () {
+      const file = this.files && this.files[0];
+      if (!file) return;
+
+      // Validação rápida de tamanho no cliente (1024 KB = 1048576 bytes)
+      if (file.size > 1024 * 1024) {
+        alert('O arquivo selecionado possui ' + Math.round(file.size / 1024) + ' KB. O limite máximo permitido é 1024 KB (1 MB). Escolha uma imagem menor.');
+        this.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        avatarPreview.src = e.target.result;
+        avatarPreview.style.display = 'block';
+        if (avatarFallback) {
+          avatarFallback.style.display = 'none';
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (btnRemoverFoto && formRemoverFoto) {
+    btnRemoverFoto.addEventListener('click', function () {
+      if (confirm('Tem certeza que deseja remover sua foto de perfil?')) {
+        formRemoverFoto.submit();
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

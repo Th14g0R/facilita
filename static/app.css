@@ -356,6 +356,15 @@ small, .muted { color: var(--muted); }
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.user-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 .user-meta {
@@ -1708,3 +1717,306 @@ td:last-child { overflow-wrap: anywhere; max-width: 500px; }
   .panel { break-inside: avoid; box-shadow: none; border-color: #ccc; }
   .table-wrap { overflow: visible; border: 0; }
 }
+
+/* ==========================================================================
+   Foto de Perfil do Cliente
+   ========================================================================== */
+.profile-avatar-large-container {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  background: var(--surface-alt);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.profile-avatar-large-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.profile-avatar-large-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+/* ==========================================================================
+   Extrato do Cliente - Cores, Sinais e Resumo Visual de Fluxo
+   ========================================================================== */
+.extrato-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+  margin-bottom: 24px;
+}
+
+.extrato-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.extrato-summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.extrato-summary-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.card-recebido {
+  border-left: 4px solid #059669;
+}
+.card-recebido .extrato-summary-icon {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+
+.card-pago {
+  border-left: 4px solid #dc2626;
+}
+.card-pago .extrato-summary-icon {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.card-aberto {
+  border-left: 4px solid var(--brand);
+}
+.card-aberto .extrato-summary-icon {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+.extrato-summary-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.extrato-summary-val {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.valor-recebido {
+  color: #059669 !important;
+  font-weight: 700;
+}
+
+.valor-pago {
+  color: #dc2626 !important;
+  font-weight: 700;
+}
+
+.fluxo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fluxo-recebido {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+  border: 1px solid rgba(5, 150, 105, 0.25);
+}
+
+.fluxo-pago {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+/* ==========================================================================
+   Modal Pop-up de Comprovantes
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-dialog {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalZoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalZoomIn {
+  from { transform: scale(0.96) translateY(8px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-alt);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.modal-close:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.modal-footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-alt);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.proof-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: var(--surface-alt);
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+
+.proof-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.proof-meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.proof-meta-value {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.proof-note-box {
+  background: var(--surface-alt);
+  border-left: 3px solid var(--muted);
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+}
+
+.proof-note-box.admin {
+  background: rgba(30, 64, 175, 0.04);
+  border-left-color: var(--brand);
+}
+
+.proof-attachment-area {
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.proof-alert-missing {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  color: var(--ink);
+}
+
+.proof-pdf-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+}
+
+.proof-img-container {
+  background: rgba(0, 0, 0, 0.04);
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+

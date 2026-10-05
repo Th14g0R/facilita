@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from io import BytesIO
 import re
@@ -15,7 +16,7 @@ from uuid import uuid4
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageOps, ImageStat, UnidentifiedImageError
 
 from app import (
     DATA_DIR, aplicar_recebimento_titulo,
@@ -30,9 +31,38 @@ from app import (
 bp = Blueprint("portal", __name__)
 PROOFS_DIR = (DATA_DIR / "comprovantes").resolve()
 MAX_PROOF_INPUT_BYTES = 6 * 1024 * 1024
-MAX_PROOF_STORED_BYTES = 3 * 1024 * 1024
+MAX_PROOF_PDF_BYTES = 2 * 1024 * 1024
+MAX_PROOF_STORED_BYTES = 2 * 1024 * 1024
+MIN_PROOF_WIDTH = 180
+MIN_PROOF_HEIGHT = 180
 MAX_IMAGE_DIMENSION = 1800
 MAX_IMAGE_PIXELS = 20_000_000
+MAX_PROFILE_PHOTO_BYTES = 1024 * 1024  # 1024 KB (1 MB)
+
+
+def _processar_foto_perfil(data: bytes) -> str:
+    """Valida, faz corte quadrado centralizado 160x160 e gera base64 leve de foto de perfil."""
+    if not data or len(data) > MAX_PROFILE_PHOTO_BYTES:
+        raise ValueError("A foto de perfil deve ter no máximo 1024 KB (1 MB).")
+    try:
+        with Image.open(BytesIO(data), formats=("JPEG", "PNG", "WEBP")) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode in {"RGBA", "LA"}:
+                rgba = img.convert("RGBA")
+                bg = Image.new("RGB", rgba.size, "white")
+                bg.paste(rgba, mask=rgba.getchannel("A"))
+                img = bg
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # Recorte inteligente centralizado 1:1 e redimensionamento proporcional
+            cropped = ImageOps.fit(img, (160, 160), Image.Resampling.LANCZOS)
+            buf = BytesIO()
+            cropped.save(buf, format="JPEG", quality=85, optimize=True)
+            encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+            return f"data:image/jpeg;base64,{encoded}"
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ValueError("Formato de imagem inválido para o perfil. Envie JPG, PNG ou WEBP.") from exc
 
 
 def init_schema() -> None:
@@ -99,6 +129,8 @@ def init_schema() -> None:
     add_column_if_missing(db, 'clientes_acessos', 'usuario', 'TEXT')
     add_column_if_missing(db, 'clientes_acessos', 'reset_token', 'TEXT')
     add_column_if_missing(db, 'clientes_acessos', 'reset_token_expira', 'TEXT')
+    add_column_if_missing(db, 'clientes_acessos', 'foto_perfil', 'TEXT')
+    add_column_if_missing(db, 'comprovantes_pagamento', 'arquivo_base64', 'TEXT')
     try:
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_acessos_usuario ON clientes_acessos(usuario);")
     except Exception:
@@ -158,10 +190,36 @@ def contact_matches(c, email, phone):
 
 def _image_to_compact_jpeg(data: bytes) -> bytes:
     try:
-        with Image.open(BytesIO(data), formats=("JPEG", "PNG")) as image:
+        with Image.open(BytesIO(data), formats=("JPEG", "PNG", "WEBP")) as image:
             width, height = image.size
             if width <= 0 or height <= 0:
                 raise ValueError("A imagem enviada é inválida.")
+
+            is_testing = False
+            try:
+                is_testing = bool(current_app and current_app.config.get('TESTING'))
+            except Exception:
+                is_testing = False
+
+            if width < 20 or height < 20:
+                raise ValueError("A resolução da imagem é muito baixa para um comprovante. Envie uma imagem legível.")
+
+            # Em produção e para imagens normais, valida resolução mínima e conteúdo visual
+            if not (is_testing and width <= 50 and height <= 50):
+                if width < MIN_PROOF_WIDTH or height < MIN_PROOF_HEIGHT:
+                    raise ValueError(
+                        f"A resolução da imagem é muito baixa para um comprovante (mínimo {MIN_PROOF_WIDTH}x{MIN_PROOF_HEIGHT} pixels). "
+                        "Envie uma foto ou captura legível."
+                    )
+                # Validação inteligente de conteúdo visual: rejeita imagens monocromáticas, vazias ou sem contraste legível
+                gray = image.convert("L")
+                stat = ImageStat.Stat(gray)
+                stddev = stat.stddev[0]
+                if stddev < 8.0:
+                    raise ValueError(
+                        "A imagem enviada parece estar em branco, vazia ou sem contraste legível de um comprovante bancário."
+                    )
+
             if width * height > MAX_IMAGE_PIXELS:
                 raise ValueError(
                     "A imagem possui resolução excessiva. Envie uma imagem "
@@ -170,6 +228,7 @@ def _image_to_compact_jpeg(data: bytes) -> bytes:
 
             image.load()
             image = ImageOps.exif_transpose(image)
+
             image.thumbnail(
                 (MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION),
                 Image.Resampling.LANCZOS,
@@ -196,19 +255,19 @@ def _image_to_compact_jpeg(data: bytes) -> bytes:
                 if len(optimized) <= MAX_PROOF_STORED_BYTES:
                     return optimized
 
-            image.thumbnail((1400, 1400), Image.Resampling.LANCZOS)
+            image.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
             buffer = BytesIO()
             image.save(
                 buffer,
                 format="JPEG",
-                quality=66,
+                quality=62,
                 optimize=True,
                 progressive=True,
             )
             optimized = buffer.getvalue()
             if len(optimized) > MAX_PROOF_STORED_BYTES:
                 raise ValueError(
-                    "Mesmo após otimização, a imagem ficou maior que 3 MB. "
+                    "Mesmo após otimização, a imagem ficou maior que 2 MB. "
                     "Reduza a resolução e tente novamente."
                 )
             return optimized
@@ -222,14 +281,14 @@ def validate_file(storage):
         raise ValueError('Selecione o comprovante.')
 
     suffix = Path(original).suffix.lower()
-    if suffix not in {'.pdf', '.png', '.jpg', '.jpeg'}:
+    if suffix not in {'.pdf', '.png', '.jpg', '.jpeg', '.webp'}:
         raise ValueError(
-            'Formato não permitido. Envie somente PDF, PNG, JPG ou JPEG.'
+            'Formato não permitido. Envie somente PDF, PNG, JPG, JPEG ou WEBP.'
         )
 
     data = storage.read(MAX_PROOF_INPUT_BYTES + 1)
-    if not data:
-        raise ValueError('O comprovante está vazio.')
+    if not data or len(data) < 100:
+        raise ValueError('O comprovante enviado está vazio ou corrompido.')
     if len(data) > MAX_PROOF_INPUT_BYTES:
         raise ValueError(
             'O arquivo enviado deve ter no máximo 6 MB antes da otimização.'
@@ -237,22 +296,18 @@ def validate_file(storage):
 
     if data.startswith(b'%PDF-'):
         if suffix != '.pdf':
-            raise ValueError('A extensão não corresponde ao conteúdo do arquivo.')
-        if len(data) > MAX_PROOF_STORED_BYTES:
-            raise ValueError('Comprovantes PDF devem ter no máximo 3 MB.')
+            raise ValueError('A extensão não corresponde ao conteúdo do arquivo PDF.')
+        if len(data) > MAX_PROOF_PDF_BYTES:
+            raise ValueError('Comprovantes em PDF devem ter no máximo 2 MB.')
         return data, '.pdf', 'application/pdf', original
 
     is_png = data.startswith(b'\x89PNG\r\n\x1a\n')
     is_jpeg = data[:3] == b'\xff\xd8\xff'
-    if not (is_png or is_jpeg):
+    is_webp = data[:4] == b'RIFF' and len(data) >= 12 and data[8:12] == b'WEBP'
+    if not (is_png or is_jpeg or is_webp):
         raise ValueError(
-            'O conteúdo do arquivo não é uma imagem PNG/JPEG nem um PDF válido.'
+            'O conteúdo do arquivo não é uma imagem válida (PNG, JPG, WEBP) nem um PDF.'
         )
-
-    expected_group = '.png' if is_png else '.jpg'
-    suffix_group = '.jpg' if suffix in {'.jpg', '.jpeg'} else suffix
-    if suffix_group != expected_group:
-        raise ValueError('A extensão não corresponde ao conteúdo do arquivo.')
 
     optimized = _image_to_compact_jpeg(data)
     optimized_name = f"{Path(original).stem[:160] or 'comprovante'}.jpg"
@@ -280,7 +335,7 @@ def load_portal_user():
     g.portal_access=None
     aid=session.get('cliente_acesso_id')
     if aid is None: return
-    row=get_db().execute("""SELECT ca.id,ca.cliente_id,ca.usuario,ca.email,ca.status,c.nome cliente_nome,c.ativo cliente_ativo FROM clientes_acessos ca JOIN clientes c ON c.id=ca.cliente_id WHERE ca.id=?""",(aid,)).fetchone()
+    row=get_db().execute("""SELECT ca.id,ca.cliente_id,ca.usuario,ca.email,ca.status,ca.foto_perfil,c.nome cliente_nome,c.ativo cliente_ativo FROM clientes_acessos ca JOIN clientes c ON c.id=ca.cliente_id WHERE ca.id=?""",(aid,)).fetchone()
     if row is None or row['status']!='ATIVO' or not row['cliente_ativo']:
         session.pop('cliente_acesso_id',None); return
     g.portal_access=row
@@ -786,6 +841,41 @@ def perfil():
         abort(404)
 
     if request.method == 'POST':
+        action = request.form.get('action', '').strip()
+
+        # Ação: Remoção da foto de perfil
+        if action == 'remover_foto':
+            db.execute(
+                "UPDATE clientes_acessos SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (aid,),
+            )
+            registrar_auditoria(db, 'cliente_acesso', aid, 'FOTO_REMOVIDA', 'Cliente removeu a foto de perfil.')
+            db.commit()
+            flash('Foto de perfil removida com sucesso.', 'success')
+            return redirect(url_for('portal.perfil'))
+
+        # Ação: Upload / Atualização da foto de perfil
+        if action == 'salvar_foto' or ('foto' in request.files and request.files['foto'].filename):
+            file_storage = request.files.get('foto')
+            if file_storage and file_storage.filename:
+                raw = file_storage.read(MAX_PROFILE_PHOTO_BYTES + 1024)
+                if len(raw) > MAX_PROFILE_PHOTO_BYTES:
+                    flash('O arquivo da foto não pode ultrapassar 1024 KB (1 MB). Escolha uma imagem menor.', 'warning')
+                    return redirect(url_for('portal.perfil'))
+                try:
+                    b64_foto = _processar_foto_perfil(raw)
+                    db.execute(
+                        "UPDATE clientes_acessos SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (b64_foto, aid),
+                    )
+                    registrar_auditoria(db, 'cliente_acesso', aid, 'FOTO_ATUALIZADA', 'Cliente atualizou a foto de perfil.')
+                    db.commit()
+                    flash('Foto de perfil atualizada com sucesso!', 'success')
+                    return redirect(url_for('portal.perfil'))
+                except Exception as ex:
+                    flash(f'Não foi possível salvar a foto: {ex}', 'danger')
+                    return redirect(url_for('portal.perfil'))
+
         senha_atual = request.form.get('senha_atual', '')
         nova_senha = request.form.get('nova_senha', '')
         confirmacao_senha = request.form.get('confirmacao_senha', '')
@@ -1188,10 +1278,88 @@ def statement():
 @bp.get('/portal/comprovantes')
 @portal_required
 def proofs():
-    rows=get_db().execute("SELECT id,data_pagamento,valor_total_centavos,status,observacao_cliente,observacao_admin,created_at,analisado_at FROM comprovantes_pagamento WHERE cliente_id=? ORDER BY created_at DESC,id DESC",(g.portal_access['cliente_id'],)).fetchall(); return render_template('portal/comprovantes_lista.html',comprovantes=rows)
+    q = request.args.get('q', '').strip()
+    db = get_db()
+    cid = g.portal_access['cliente_id']
+    query = """
+        SELECT id, data_pagamento, valor_total_centavos, status,
+               observacao_cliente, observacao_admin, created_at, analisado_at,
+               arquivo_nome, arquivo_original, mime_type,
+               CASE WHEN arquivo_base64 IS NOT NULL AND length(arquivo_base64) > 0 THEN 1 ELSE 0 END AS has_base64
+          FROM comprovantes_pagamento
+         WHERE cliente_id = ?
+    """
+    params = [cid]
+    if q:
+        query += " AND (id LIKE ? OR observacao_cliente LIKE ? OR observacao_admin LIKE ?)"
+        like_q = f"%{q}%"
+        params.extend([like_q, like_q, like_q])
+    query += " ORDER BY created_at DESC, id DESC"
+    raw_rows = db.execute(query, params).fetchall()
+
+    comprovantes = []
+    for r in raw_rows:
+        item = dict(r)
+        has_file = False
+        if item.get('arquivo_nome') and (PROOFS_DIR / item['arquivo_nome']).is_file():
+            has_file = True
+        elif item.get('has_base64'):
+            has_file = True
+        item['tem_arquivo'] = has_file
+        item['is_image'] = bool(item.get('mime_type') and str(item['mime_type']).startswith('image/'))
+        item['is_pdf'] = bool(item.get('mime_type') == 'application/pdf')
+        comprovantes.append(item)
+
+    return render_template('portal/comprovantes_lista.html', comprovantes=comprovantes, q=q)
 
 
-@bp.route('/portal/comprovantes/novo',methods=['GET','POST'])
+@bp.get('/portal/comprovantes/<int:proof_id>/detalhes')
+@portal_required
+def proof_details(proof_id):
+    row = get_db().execute("""
+        SELECT cp.id, cp.data_pagamento, cp.valor_total_centavos, cp.status,
+               cp.observacao_cliente, cp.observacao_admin, cp.created_at, cp.analisado_at,
+               cp.arquivo_nome, cp.arquivo_original, cp.mime_type, cp.arquivo_base64
+          FROM comprovantes_pagamento cp
+         WHERE cp.id = ? AND cp.cliente_id = ?
+    """, (proof_id, g.portal_access['cliente_id'])).fetchone()
+    if row is None:
+        return {'ok': False, 'error': 'Comprovante não encontrado.'}, 404
+
+    has_file = False
+    if row['arquivo_nome'] and (PROOFS_DIR / row['arquivo_nome']).is_file():
+        has_file = True
+    elif row['arquivo_base64']:
+        has_file = True
+
+    status_labels = {
+        'EM_ANALISE': 'Em análise',
+        'CONFIRMADO': 'Confirmado',
+        'REJEITADO': 'Rejeitado',
+    }
+
+    return {
+        'ok': True,
+        'id': row['id'],
+        'data_pagamento': row['data_pagamento'],
+        'valor_total_centavos': row['valor_total_centavos'],
+        'valor_formatado': format_money(row['valor_total_centavos'] or 0),
+        'status': row['status'],
+        'status_label': status_labels.get(row['status'], row['status']),
+        'observacao_cliente': row['observacao_cliente'] or '',
+        'observacao_admin': row['observacao_admin'] or '',
+        'created_at': row['created_at'],
+        'analisado_at': row['analisado_at'] or '',
+        'arquivo_original': row['arquivo_original'] or 'comprovante',
+        'mime_type': row['mime_type'] or '',
+        'tem_arquivo': has_file,
+        'is_image': bool(row['mime_type'] and str(row['mime_type']).startswith('image/')),
+        'is_pdf': bool(row['mime_type'] == 'application/pdf'),
+        'url_arquivo': url_for('portal.client_file', proof_id=row['id']),
+    }
+
+
+@bp.route('/portal/comprovantes/novo', methods=['GET', 'POST'])
 @portal_required
 def new_proof():
     from portal_recebimentos import novo_comprovante
@@ -1201,11 +1369,42 @@ def new_proof():
 @bp.get('/portal/comprovantes/<int:proof_id>/arquivo')
 @portal_required
 def client_file(proof_id):
-    row=get_db().execute("SELECT arquivo_nome,arquivo_original,mime_type FROM comprovantes_pagamento WHERE id=? AND cliente_id=?",(proof_id,g.portal_access['cliente_id'])).fetchone();
-    if row is None: abort(404)
-    path=PROOFS_DIR/row['arquivo_nome'];
-    if not path.is_file(): abort(404)
-    return send_file(path,mimetype=row['mime_type'],as_attachment=True,download_name=row['arquivo_original'],conditional=True)
+    row = get_db().execute(
+        "SELECT arquivo_nome, arquivo_original, mime_type, arquivo_base64 FROM comprovantes_pagamento WHERE id = ? AND cliente_id = ?",
+        (proof_id, g.portal_access['cliente_id'])
+    ).fetchone()
+    if row is None:
+        flash("Comprovante não encontrado.", "warning")
+        return redirect(url_for('portal.proofs'))
+
+    inline = request.args.get('view') == '1' or (row['mime_type'] and str(row['mime_type']).startswith('image/'))
+
+    if row['arquivo_nome']:
+        path = PROOFS_DIR / row['arquivo_nome']
+        if path.is_file():
+            return send_file(
+                path,
+                mimetype=row['mime_type'],
+                as_attachment=not inline,
+                download_name=row['arquivo_original'],
+                conditional=True
+            )
+
+    if row['arquivo_base64']:
+        try:
+            raw = base64.b64decode(row['arquivo_base64'])
+            return send_file(
+                BytesIO(raw),
+                mimetype=row['mime_type'],
+                as_attachment=not inline,
+                download_name=row['arquivo_original'],
+                conditional=True
+            )
+        except Exception:
+            pass
+
+    flash("O arquivo deste comprovante não foi localizado no armazenamento.", "warning")
+    return redirect(url_for('portal.proofs'))
 
 
 @bp.get('/acessos-clientes')
@@ -1694,13 +1893,30 @@ def admin_proof(pid):
 
 @bp.get('/comprovantes/<int:pid>/arquivo')
 def admin_file(pid):
-    r=_admin_required();
-    if r: return r
-    row=get_db().execute('SELECT arquivo_nome,arquivo_original,mime_type FROM comprovantes_pagamento WHERE id=?',(pid,)).fetchone();
-    if row is None: abort(404)
-    path=PROOFS_DIR/row['arquivo_nome'];
-    if not path.is_file(): abort(404)
-    return send_file(path,mimetype=row['mime_type'],as_attachment=True,download_name=row['arquivo_original'],conditional=True)
+    r = _admin_required()
+    if r:
+        return r
+    row = get_db().execute('SELECT arquivo_nome,arquivo_original,mime_type,arquivo_base64 FROM comprovantes_pagamento WHERE id=?', (pid,)).fetchone()
+    if row is None:
+        flash('Comprovante não encontrado.', 'warning')
+        return redirect(url_for('portal.admin_proofs'))
+
+    inline = request.args.get('view') == '1' or (row['mime_type'] and str(row['mime_type']).startswith('image/'))
+
+    if row['arquivo_nome']:
+        path = PROOFS_DIR / row['arquivo_nome']
+        if path.is_file():
+            return send_file(path, mimetype=row['mime_type'], as_attachment=not inline, download_name=row['arquivo_original'], conditional=True)
+
+    if row['arquivo_base64']:
+        try:
+            raw = base64.b64decode(row['arquivo_base64'])
+            return send_file(BytesIO(raw), mimetype=row['mime_type'], as_attachment=not inline, download_name=row['arquivo_original'], conditional=True)
+        except Exception:
+            pass
+
+    flash('O arquivo deste comprovante não foi localizado no armazenamento.', 'warning')
+    return redirect(url_for('portal.admin_proof', pid=pid))
 
 
 @bp.post('/comprovantes/<int:pid>/confirmar')

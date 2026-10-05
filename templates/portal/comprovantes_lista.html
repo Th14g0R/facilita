@@ -1,14 +1,309 @@
-{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}Meus comprovantes{% endblock %}{% block content %}<header class="page-heading">
-<div>
-<p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>Meus comprovantes</h1>
-</div>
-<div class="actions">
-<a class="button primary" href="{{ url_for('portal.new_proof') }}">Enviar comprovante</a>
-</div>
+{% extends 'base.html' %}
+{% from '_macros.html' import field with context %}
+{% block title %}Meus comprovantes{% endblock %}
+
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">CONTROLE FINANCEIRO</p>
+    <h1>Meus comprovantes</h1>
+  </div>
+  <div class="actions">
+    <a class="button primary" href="{{ url_for('portal.new_proof') }}">Enviar comprovante</a>
+  </div>
 </header>
+
 <section class="panel">
-<form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}<button class="button">Filtrar</button>
-<a href="{{ request.path }}">Limpar</a>
-</form>{{ table(comprovantes,[('id', 'Comprovante'), ('data_pagamento', 'Pagamento'), ('valor_total_centavos', 'Valor'), ('status', 'Situação'), ('observacao_admin', 'Resposta')],'portal.client_file','proof_id') }}</section>{% endblock %}
+  <form method="get" class="filters">
+    {{ field("q", "Pesquisar", request.args.get("q", "")) }}
+    <button class="button">Filtrar</button>
+    {% if request.args.get("q") %}
+      <a href="{{ request.path }}" class="button" style="text-decoration: none;">Limpar</a>
+    {% endif %}
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Comprovante</th>
+          <th scope="col">Pagamento</th>
+          <th scope="col" class="money">Valor</th>
+          <th scope="col">Situação</th>
+          <th scope="col">Resposta</th>
+          <th scope="col" style="text-align: right;">Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in comprovantes %}
+          <tr>
+            <td style="font-weight: 600;">#{{ c.id }}</td>
+            <td>{{ c.data_pagamento|date_br }}</td>
+            <td class="money" style="font-weight: 600;">{{ c.valor_total_centavos|money }}</td>
+            <td>
+              {% if c.status == 'CONFIRMADO' %}
+                <span class="badge success">Confirmado</span>
+              {% elif c.status == 'REJEITADO' %}
+                <span class="badge danger">Rejeitado</span>
+              {% else %}
+                <span class="badge warning">Em análise</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if c.observacao_admin %}
+                <span title="{{ c.observacao_admin }}" style="display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  {{ c.observacao_admin }}
+                </span>
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td style="text-align: right;">
+              <button type="button" class="button-link js-open-proof-modal"
+                      data-id="{{ c.id }}"
+                      data-pagamento="{{ c.data_pagamento|date_br }}"
+                      data-valor="{{ c.valor_total_centavos|money }}"
+                      data-status="{{ c.status }}"
+                      data-status-label="{% if c.status=='CONFIRMADO' %}Confirmado{% elif c.status=='REJEITADO' %}Rejeitado{% else %}Em análise{% endif %}"
+                      data-obs-cliente="{{ c.observacao_cliente or '' }}"
+                      data-obs-admin="{{ c.observacao_admin or '' }}"
+                      data-created="{% if c.created_at %}{{ c.created_at[:10]|date_br }}{% endif %}"
+                      data-analisado="{% if c.analisado_at %}{{ c.analisado_at[:10]|date_br }}{% endif %}"
+                      data-tem-arquivo="{{ '1' if c.tem_arquivo else '0' }}"
+                      data-is-image="{{ '1' if c.is_image else '0' }}"
+                      data-is-pdf="{{ '1' if c.is_pdf else '0' }}"
+                      data-url="{{ url_for('portal.client_file', proof_id=c.id) }}"
+                      data-nome-arquivo="{{ c.arquivo_original or 'comprovante' }}"
+                      style="background: none; border: none; padding: 4px 8px; color: var(--brand); font-weight: 600; cursor: pointer; text-decoration: none;">
+                Abrir &rarr;
+              </button>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="6">
+              <div class="empty">Nenhum comprovante encontrado.</div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Modal de Detalhes do Comprovante (Pop-up na frente da tela) -->
+<div id="proofModal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" style="display: none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <h3 id="modalTitle" style="margin: 0; font-size: 18px;">Comprovante</h3>
+        <span id="modalStatusBadge" class="badge">Em análise</span>
+      </div>
+      <button type="button" class="modal-close" aria-label="Fechar pop-up" id="btnModalClose">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Grid de Metadados -->
+      <div class="proof-meta-grid">
+        <div class="proof-meta-item">
+          <span class="proof-meta-label">Data de Pagamento</span>
+          <strong id="modalDataPagamento" class="proof-meta-value">—</strong>
+        </div>
+        <div class="proof-meta-item">
+          <span class="proof-meta-label">Valor Declarado</span>
+          <strong id="modalValor" class="proof-meta-value money">—</strong>
+        </div>
+        <div class="proof-meta-item">
+          <span class="proof-meta-label">Enviado em</span>
+          <span id="modalDataEnvio" class="proof-meta-value">—</span>
+        </div>
+        <div class="proof-meta-item">
+          <span class="proof-meta-label">Analisado em</span>
+          <span id="modalDataAnalisado" class="proof-meta-value">—</span>
+        </div>
+      </div>
+
+      <!-- Observações -->
+      <div id="boxObsCliente" class="proof-note-box" style="display: none;">
+        <strong style="display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 4px;">Sua observação:</strong>
+        <p id="modalObsCliente" style="margin: 0; font-size: 13px; color: var(--ink); white-space: pre-wrap;"></p>
+      </div>
+
+      <div id="boxObsAdmin" class="proof-note-box admin" style="display: none;">
+        <strong style="display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--brand); margin-bottom: 4px;">Resposta do Administrador:</strong>
+        <p id="modalObsAdmin" style="margin: 0; font-size: 13px; color: var(--ink); white-space: pre-wrap;"></p>
+      </div>
+
+      <!-- Visualização do Anexo -->
+      <div class="proof-attachment-area">
+        <h4 style="font-size: 14px; margin: 0 0 10px; color: var(--ink);">Documento / Anexo</h4>
+
+        <!-- Caso o arquivo não exista no servidor -->
+        <div id="boxArquivoInexistente" class="proof-alert-missing" style="display: none;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; color: var(--warning, #d97706);">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <div>
+            <strong>Arquivo não localizado no armazenamento</strong>
+            <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.9;">
+              O arquivo físico deste envio não está disponível neste servidor. As informações financeiras e os registros continuam salvos com segurança.
+            </p>
+          </div>
+        </div>
+
+        <!-- Caso seja imagem -->
+        <div id="boxArquivoImagem" style="display: none; text-align: center;">
+          <div class="proof-img-container">
+            <img id="modalImgPreview" src="" alt="Comprovante" style="max-width: 100%; max-height: 440px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: inline-block;">
+          </div>
+          <div style="margin-top: 10px;">
+            <a id="btnDownloadImg" href="#" target="_blank" rel="noopener" class="button" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Abrir imagem em tamanho original
+            </a>
+          </div>
+        </div>
+
+        <!-- Caso seja PDF -->
+        <div id="boxArquivoPdf" class="proof-pdf-box" style="display: none;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #dc2626; flex-shrink: 0;">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <div style="flex: 1; min-width: 0;">
+            <strong id="modalPdfNome" style="display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">comprovante.pdf</strong>
+            <span class="muted" style="font-size: 12px;">Documento em formato PDF</span>
+          </div>
+          <a id="btnDownloadPdf" href="#" target="_blank" rel="noopener" class="button primary" style="font-size: 13px; text-decoration: none;">
+            Visualizar / Baixar
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="button" id="btnModalCloseFooter">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const modal = document.getElementById('proofModal');
+  const title = document.getElementById('modalTitle');
+  const statusBadge = document.getElementById('modalStatusBadge');
+  const dataPagamento = document.getElementById('modalDataPagamento');
+  const valor = document.getElementById('modalValor');
+  const dataEnvio = document.getElementById('modalDataEnvio');
+  const dataAnalisado = document.getElementById('modalDataAnalisado');
+
+  const boxObsCliente = document.getElementById('boxObsCliente');
+  const obsCliente = document.getElementById('modalObsCliente');
+  const boxObsAdmin = document.getElementById('boxObsAdmin');
+  const obsAdmin = document.getElementById('modalObsAdmin');
+
+  const boxArquivoInexistente = document.getElementById('boxArquivoInexistente');
+  const boxArquivoImagem = document.getElementById('boxArquivoImagem');
+  const imgPreview = document.getElementById('modalImgPreview');
+  const btnDownloadImg = document.getElementById('btnDownloadImg');
+
+  const boxArquivoPdf = document.getElementById('boxArquivoPdf');
+  const pdfNome = document.getElementById('modalPdfNome');
+  const btnDownloadPdf = document.getElementById('btnDownloadPdf');
+
+  function openModal(btn) {
+    const d = btn.dataset;
+    title.textContent = 'Comprovante #' + d.id;
+
+    // Status Badge
+    statusBadge.textContent = d.statusLabel || 'Em análise';
+    statusBadge.className = 'badge';
+    if (d.status === 'CONFIRMADO') statusBadge.classList.add('success');
+    else if (d.status === 'REJEITADO') statusBadge.classList.add('danger');
+    else statusBadge.classList.add('warning');
+
+    // Metadados
+    dataPagamento.textContent = d.pagamento || '—';
+    valor.textContent = d.valor || '—';
+    dataEnvio.textContent = d.created || '—';
+    dataAnalisado.textContent = d.analisado || 'Aguardando';
+
+    // Observações
+    if (d.obsCliente && d.obsCliente.trim()) {
+      obsCliente.textContent = d.obsCliente;
+      boxObsCliente.style.display = 'block';
+    } else {
+      boxObsCliente.style.display = 'none';
+    }
+
+    if (d.obsAdmin && d.obsAdmin.trim()) {
+      obsAdmin.textContent = d.obsAdmin;
+      boxObsAdmin.style.display = 'block';
+    } else {
+      boxObsAdmin.style.display = 'none';
+    }
+
+    // Arquivo
+    boxArquivoInexistente.style.display = 'none';
+    boxArquivoImagem.style.display = 'none';
+    boxArquivoPdf.style.display = 'none';
+
+    const temArquivo = d.temArquivo === '1';
+    const isImage = d.isImage === '1';
+    const isPdf = d.isPdf === '1';
+
+    if (!temArquivo) {
+      boxArquivoInexistente.style.display = 'flex';
+    } else if (isImage) {
+      imgPreview.src = d.url + '?view=1';
+      btnDownloadImg.href = d.url;
+      boxArquivoImagem.style.display = 'block';
+    } else if (isPdf) {
+      pdfNome.textContent = d.nomeArquivo || 'comprovante.pdf';
+      btnDownloadPdf.href = d.url;
+      boxArquivoPdf.style.display = 'flex';
+    } else {
+      boxArquivoInexistente.style.display = 'flex';
+    }
+
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    imgPreview.src = '';
+  }
+
+  document.querySelectorAll('.js-open-proof-modal').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      openModal(btn);
+    });
+  });
+
+  document.getElementById('btnModalClose').addEventListener('click', closeModal);
+  document.getElementById('btnModalCloseFooter').addEventListener('click', closeModal);
+
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) {
+      closeModal();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.style.display === 'flex') {
+      closeModal();
+    }
+  });
+});
+</script>
+{% endblock %}

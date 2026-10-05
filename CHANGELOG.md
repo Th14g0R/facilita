@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.4.2 — 2026-10-05
+
+- **Visualização de Comprovantes em Modal Pop-up (sem erro 404)**:
+  - Substituição da navegação de página pelo novo modal pop-up moderno, exibido sobre a tela ao clicar em "Abrir" nos comprovantes do portal.
+  - Exibição inline de metadados, valores formatados, badges de situação, observação do cliente e resposta do administrador.
+  - Fallback resiliente com armazenamento em Base64: em servidores serverless (Vercel) onde arquivos locais são efêmeros, o arquivo é recuperado do banco e servido instantaneamente em memória.
+  - Tratamento suave caso o anexo físico não esteja disponível no servidor: mensagem amigável no próprio modal alertando que o arquivo não foi localizado, sem quebrar a tela nem exibir o erro 404.
+- **Identificação Visual por Cores e Sinais (+ / -) no Extrato do Cliente**:
+  - Diferenciação visual clara do fluxo financeiro:
+    - **Aportes / Disponibilizações**: destacados com sinal positivo `+` em verde e badge explicativo `+ Recebido pelo cliente`.
+    - **Taxa de Serviço, Amortizações e Liquidações**: destacados com sinal negativo `-` em vermelho e badge explicativo `- Pago ao Facilita`.
+  - Novos cards de balanço do período no topo do extrato: *Total Recebido (Aportes)*, *Total Pago ao Facilita* e *Títulos em Aberto*, com suporte completo ao Modo Privacidade.
+- **Foto de Perfil do Cliente com Limite de 1024 KB e Corte Inteligente**:
+  - Nova funcionalidade na tela `/portal/perfil` permitindo ao cliente enviar, alterar ou remover sua foto de perfil.
+  - Limite estrito de arquivo de **1024 KB (1 MB)** e validação de formatos (PNG, JPG, WEBP).
+  - Algoritmo de corte quadrado centralizado 1:1 e redimensionamento proporcional (160x160 px com compactação otimizada ~15 KB), aceitando fotos de qualquer resolução (incluindo 4K) sem ocupar espaço excessivo no servidor.
+  - Miniatura circular (32x32 px) exibida diretamente ao lado do nome do cliente na barra de perfil do menu retrátil e suspenso.
+- **Validação Inteligente e Anti-Desperdício de Comprovantes**:
+  - Limite reduzido para PDFs de comprovante (até 2 MB) e verificação de integridade mínima.
+  - Resolução mínima de 180x180 pixels para fotos e capturas de comprovantes.
+  - Detecção com Pillow de imagens sem contraste/informação (desvio padrão de cinza < 8.0), descartando imagens monocromáticas, telas em branco, pretas ou vazias para evitar envios desnecessários.
+- **Cobertura de Testes**: inclusão de `tests/test_portal_novidades.py` elevando a suíte para 191 testes automatizados com 100% de aprovação.
+
 ## 2.4.1 — 2026-10-05
 
 - **Recuperação de Senha do Portal do Cliente**: nova tela `/portal/recuperar-senha` oferecendo duas opções claras para quando o cliente perde o acesso:
