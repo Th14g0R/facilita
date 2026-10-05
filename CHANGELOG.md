@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.0 — 2026-10-05
+
+- Mini Sidebar colapsada com Hover Suspenso (estilo Beatrix): quando recolhida, a barra lateral passa a exibir um trilho compacto de 68px com ícones centralizados; ao passar o mouse, expande suavemente como um menu suspenso flutuante sobre a página sem deslocar o conteúdo.
+- Botão de controle unificado: remoção do botão duplicado do cabeçalho da sidebar, mantendo o botão hambúrguer limpo e integrado na barra superior (topbar).
+- Ícones em todos os itens do menu: 12 novos ícones SVG vetoriais adicionados à navegação administrativa e do portal do cliente.
+- Agrupamento lógico de menus: itens organizados em seções estruturadas (`Principal`, `Operações & Finanças` e `Gestão & Segurança`).
+- Simplificação definitiva de versionamento: remoção de metadados de build, adotando versão semântica direta (`v2.4.0`).
+
 ## 2.3.0 — 2026-10-05
 
 - Novo gerenciamento de perfil: páginas dedicadas e seguras `/perfil` (Administrador) e `/portal/perfil` (Cliente), permitindo edição de dados cadastrais e alteração de senha de acesso com confirmação da senha atual.
