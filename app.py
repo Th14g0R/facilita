@@ -73,8 +73,12 @@ if (os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")) and 
     # Fallback de produção para Supabase PostgreSQL caso não configurado manualmente no painel da Vercel
     if not os.environ.get("DATABASE_URL"):
         os.environ["DATABASE_URL"] = "postgresql://postgres.jkyluxdpyepfjjjwlgfs:yVJkoTz62KoUxRNG@aws-0-sa-east-1.pooler.supabase.com:6543/postgres"
+    else:
+        os.environ["DATABASE_URL"] = os.environ["DATABASE_URL"].strip()
     if not os.environ.get("SECRET_KEY"):
         os.environ["SECRET_KEY"] = "e83d8a57ba8d6f54c9b99092491fa51139ce6b9c9fbd2f939e0ebc5c93c4bb91"
+    else:
+        os.environ["SECRET_KEY"] = os.environ["SECRET_KEY"].strip()
     os.environ.setdefault("EMPRESTIMO_BEHIND_PROXY", "1")
 else:
     default_data_dir = str(BASE_DIR / "data")

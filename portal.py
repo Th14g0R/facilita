@@ -1397,5 +1397,8 @@ def register_portal(app):
         PROOFS_DIR.mkdir(parents=True,exist_ok=True)
     except OSError:
         pass
-    with app.app_context(): init_schema()
+    try:
+        with app.app_context(): init_schema()
+    except Exception as _p_err:
+        app.logger.warning("Aviso durante init_schema do portal: %s", _p_err)
     app.register_blueprint(bp)

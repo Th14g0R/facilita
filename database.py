@@ -18,7 +18,8 @@ except ImportError:
 
 def get_database_url() -> str | None:
     from flask import current_app
-    return os.environ.get("DATABASE_URL") or current_app.config.get("DATABASE_URL")
+    url = os.environ.get("DATABASE_URL") or current_app.config.get("DATABASE_URL")
+    return url.strip() if url else None
 
 def is_postgres() -> bool:
     # Se EMPRESTIMO_DATABASE foi fornecido explicitamente, prioriza o SQLite indicado
@@ -50,6 +51,7 @@ def get_pg_pool(uri: str):
     global _pg_pool
     if _pg_pool is None and psycopg2:
         import psycopg2.pool
+        uri = uri.strip()
         if uri.startswith("postgres://"):
             uri = "postgresql://" + uri[len("postgres://"):]
         max_conn = int(os.environ.get("PG_MAX_CONNECTIONS", "8"))
@@ -142,6 +144,7 @@ class PostgresConnection:
     def __init__(self, uri: str, pool=None):
         if not psycopg2:
             raise RuntimeError("psycopg2-binary é necessário para conexões PostgreSQL.")
+        uri = uri.strip()
         if uri.startswith("postgres://"):
             uri = "postgresql://" + uri[len("postgres://"):]
         self._uri = uri
