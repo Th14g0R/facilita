@@ -3,8 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static',filename='favicon-32x32.png') }}">
+<link rel="icon" type="image/png" sizes="64x64" href="{{ url_for('static',filename='favicon.png') }}">
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static',filename='favicon.svg') }}">
-<link rel="apple-touch-icon" href="{{ url_for('static',filename='favicon.svg') }}">
+<link rel="shortcut icon" href="{{ url_for('static',filename='favicon.ico') }}">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static',filename='apple-touch-icon.png') }}">
 <link rel="manifest" href="{{ url_for('static',filename='manifest.json') }}">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6f8">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c1421">
@@ -72,7 +75,9 @@
 {% if show_sidebar %}<aside class="sidebar" id="appSidebar">
 <div class="sidebar-header">
   <a class="brand" href="{{ url_for('portal.dashboard' if portal_area else 'dashboard') }}" title="Facilita">
-    <span class="brand-icon">F</span>
+    <span class="brand-icon brand-icon-img">
+      <img src="{{ url_for('static',filename='logo-icon.png') }}" alt="Facilita" width="34" height="34">
+    </span>
     <span class="brand-text">Facilita</span>
   </a>
 </div>

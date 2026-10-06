@@ -17,7 +17,14 @@
   - Seleção padrão na "Área do Cliente" tanto em `/login` quanto em `/portal/login`, com alternância imediata para "Administrador" com um clique.
   - Eliminação do link redundante de recuperação de senha: mantido apenas um link claro e direto ("Esqueceu a senha?").
   - Identificação de marca no topo atualizada para "FACILITA".
-- **Suíte de Testes Automatizados**: ampliação para 204 testes unitários com 100% de sucesso.
+- **Nova Identidade Visual, Logotipo Transparente e Favicon Oficial**:
+  - Incorporação do logotipo oficial Facilita com fundo 100% transparente (`logo.png` e `logo-horizontal.png`).
+  - Criação dos novos favicons oficiais em alta fidelidade (`favicon.png`, `favicon-32x32.png`, `favicon.ico`, `favicon.svg` e `apple-touch-icon.png`).
+  - Atualização do ícone da barra lateral com o símbolo da marca e exibição da logo no topo da tela de login unificada.
+  - Atualização do `manifest.json` com os novos ícones para instalação como app mobile (PWA).
+- **Remoção de Arquivos Legados de Instalação Local**:
+  - Exclusão dos scripts `.bat`, `.command`, `.ps1` e documentações de instalação desktop antigas, tornando o projeto 100% voltado para nuvem (Vercel Serverless + Supabase PostgreSQL).
+- **Suíte de Testes Automatizados**: 188 testes unitários passando com 100% de sucesso.
 
 ## 2.4.6 — 2026-10-05
 

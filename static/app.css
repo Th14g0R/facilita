@@ -225,6 +225,40 @@ small, .muted { color: var(--muted); }
   flex-shrink: 0;
 }
 
+.brand-icon-img {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.brand-icon-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.auth-brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.auth-brand img {
+  max-height: 130px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.05));
+  transition: transform 0.2s ease;
+}
+
+.auth-brand img:hover {
+  transform: scale(1.02);
+}
+
 .brand-text {
   transition: opacity 0.15s ease;
   white-space: nowrap;

@@ -2,12 +2,14 @@
 {% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
 {% block title %}Acesse sua conta · Facilita{% endblock %}
 {% block content %}
-<header class="page-heading">
+<div class="auth-brand">
+  <img src="{{ url_for('static', filename='logo.png') }}" alt="Facilita · Controle Financeiro">
+</div>
+
+<header class="page-heading" style="text-align: center; justify-content: center; margin-bottom: 18px;">
   <div>
     <p class="eyebrow">FACILITA</p>
     <h1>Acesse sua conta</h1>
-  </div>
-  <div class="actions">
   </div>
 </header>
 
