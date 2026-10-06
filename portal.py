@@ -603,6 +603,8 @@ def register():
 
 @bp.route('/portal/login', methods=['GET', 'POST'])
 def login():
+    if getattr(g, 'portal_access', None) is not None:
+        return redirect(url_for('portal.dashboard'))
     login_val = (request.form.get('login') or request.form.get('email') or '').strip().lower()
     if request.method == 'POST':
         password = request.form.get('senha', '')
@@ -671,12 +673,9 @@ def login():
             )
             return render_template('portal/login.html', login=login_val, email=login_val), 403
         csrf = session.get('csrf_token')
-        admin = session.get('usuario_id')
         session.clear()
         if csrf:
             session['csrf_token'] = csrf
-        if admin:
-            session['usuario_id'] = admin
         session['cliente_acesso_id'] = row['id']
         session.permanent = True
         db.execute(
@@ -691,9 +690,13 @@ def login():
     return render_template('portal/login.html', login=login_val, email=login_val)
 
 
-@bp.post('/portal/logout')
-@portal_required
-def logout(): session.pop('cliente_acesso_id',None); flash('Sessão encerrada.','success'); return redirect(url_for('portal.login'))
+@bp.route('/portal/logout', methods=['GET', 'POST'])
+def logout():
+    session.pop('cliente_acesso_id', None)
+    if 'usuario_id' not in session:
+        session.clear()
+    flash('Sessão encerrada.', 'success')
+    return redirect(url_for('portal.login'))
 
 
 @bp.route('/portal/esqueci-senha', methods=['GET', 'POST'])
@@ -1528,15 +1531,21 @@ def statement():
         SELECT e.id, e.descricao, e.data_emprestimo,
                e.valor_original_centavos, e.saldo_atual_centavos,
                e.status,
-               MAX(
-                   COALESCE((
+               CASE
+                   WHEN COALESCE((
                         SELECT SUM(m.valor_centavos)
                           FROM movimentacoes_emprestimo m
                          WHERE m.emprestimo_id = e.id
                            AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
-                   ), 0),
-                   e.valor_original_centavos - e.saldo_atual_centavos
-               ) AS total_amortizado_centavos
+                   ), 0) >= (e.valor_original_centavos - e.saldo_atual_centavos)
+                   THEN COALESCE((
+                        SELECT SUM(m.valor_centavos)
+                          FROM movimentacoes_emprestimo m
+                         WHERE m.emprestimo_id = e.id
+                           AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
+                   ), 0)
+                   ELSE (e.valor_original_centavos - e.saldo_atual_centavos)
+               END AS total_amortizado_centavos
           FROM emprestimos e
          WHERE e.cliente_id = ?
          ORDER BY

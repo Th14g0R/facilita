@@ -35,6 +35,8 @@
 <body>
 <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
 {% set portal_area = request.endpoint and request.endpoint.startswith('portal.') and not request.endpoint.startswith('portal.admin') and request.endpoint not in ['portal.edit_access'] %}
+{% set is_auth_screen = request.endpoint in ['login', 'portal.login', 'portal.recuperar_senha', 'portal.redefinir_senha', 'portal.cadastro', 'configuracao_inicial'] %}
+{% set show_sidebar = not is_auth_screen and ((portal_area and g.portal_access) or (not portal_area and g.usuario)) %}
 {% macro nav_icon(name) %}
 {% if name == 'dashboard' %}
 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
@@ -67,7 +69,7 @@
 {% endif %}
 {% endmacro %}
 
-{% if g.usuario or g.portal_access %}<aside class="sidebar" id="appSidebar">
+{% if show_sidebar %}<aside class="sidebar" id="appSidebar">
 <div class="sidebar-header">
   <a class="brand" href="{{ url_for('portal.dashboard' if portal_area else 'dashboard') }}" title="Facilita">
     <span class="brand-icon">F</span>
@@ -195,10 +197,10 @@
 </div>
 </aside>{% endif %}
 
-<main id="conteudo" class="{{ 'workspace' if g.usuario or g.portal_access else 'public' }}">
+<main id="conteudo" class="{{ 'workspace' if show_sidebar else 'public' }}">
 <div class="topbar">
   <div class="topbar-info">
-    {% if g.usuario or g.portal_access %}
+    {% if show_sidebar %}
     <button type="button" class="btn-topbar-sidebar-toggle" id="btnTopbarSidebarToggle" aria-label="Alternar menu lateral" title="Alternar menu lateral">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -230,7 +232,7 @@
       </svg>
     </button>
 
-    {% if g.usuario or g.portal_access %}
+    {% if show_sidebar %}
     <!-- Botão de Modo Privacidade: apenas ícone de olho -->
     <button type="button" class="btn-privacy-toggle" id="btnPrivacyToggle" aria-label="Ocultar valores da tela" aria-pressed="false" title="Ocultar valores na tela (Modo Privacidade)">
       <svg class="icon-eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.4.4 — 2026-10-05
+
+- **Compatibilidade PostgreSQL (Supabase) vs SQLite em Cálculos de Contratos**:
+  - Correção crítica da consulta SQL de amortizações e contratos: substituição do uso de função escalar não suportada no PostgreSQL (`MAX(col1, col2)`) por sintaxe ANSI SQL universal `CASE WHEN col1 >= col2 THEN col1 ELSE col2 END`.
+  - Eliminação do erro `500 Internal Server Error` (`psycopg2.errors.UndefinedFunction: function max(bigint, bigint) does not exist`) no painel do cliente no Supabase em produção.
+- **Isolamento Estrito de Sessão e Eliminação do Loop de Login**:
+  - Limpeza total de resíduos de sessão administrativa ao autenticar no portal do cliente e vice-versa.
+  - Correção na rota `/login` (área administrativa): clientes logados agora são redirecionados automaticamente para `/portal` em vez de ficarem presos na tela com formulário inoperante.
+  - Ocultação definitiva de elementos de navegação/sidebar em telas de autenticação (`/login`, `/portal/login`, etc.), impedindo vazamento de menus administrativos para clientes.
+- **Resiliência de Logout e Tela de Erro 500 Contextual**:
+  - Rotas de logout (`/logout` e `/portal/logout`) tornadas tolerantes a requisições `GET` e `POST` diretas sem bloqueio por `@login_required`, garantindo que qualquer usuário consiga deslogar instantaneamente mesmo em estado de sessão anômalo.
+  - Tela de erro 500 (`Erro interno ao carregar a página`) aprimorada para ser contextual: detecta se a requisição originou-se do portal do cliente ou do painel administrativo, oferecendo links de retorno adequados (`/portal` vs `/dashboard`) e botão de encerramento de sessão imediato para não prender o usuário.
+- **Suíte de Testes Automatizados**: ampliação para 197 testes unitários automatizados com 100% de sucesso.
+
 ## 2.4.3 — 2026-10-05
 
 - **Painel "Minha Visão Geral" & Somatório de Contratos**:

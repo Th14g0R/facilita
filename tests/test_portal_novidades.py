@@ -340,6 +340,33 @@ class TestPortalNovidades(unittest.TestCase):
         self.assertIn("Total Amortizado Pago", html)
         self.assertIn("Total Histórico Pago", html)
 
+    def test_portal_logout_get_e_post(self):
+        """Testa que o logout do portal funciona tanto por GET quanto por POST."""
+        self.authenticate_portal(1)
+        resp = self.client.get('/portal/logout', follow_redirects=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.location, '/portal/login')
+        with self.client.session_transaction() as sess:
+            self.assertNotIn('cliente_acesso_id', sess)
+
+    def test_login_admin_nao_exibe_sidebar_para_cliente(self):
+        """Garante que na tela /login a sidebar não é exibida mesmo se houver cliente_acesso_id."""
+        self.authenticate_portal(1)
+        resp = self.client.get('/login', follow_redirects=False)
+        # Deve redirecionar para o portal do cliente
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.location, '/portal')
+
+    def test_handler_500_contextual_portal(self):
+        """Testa que erro 500 no portal gera links de retorno para /portal e logout do portal."""
+        with self.app.test_request_context('/portal/algum-erro'):
+            from werkzeug.exceptions import InternalServerError
+            res = self.app.handle_user_exception(InternalServerError("Falha simulada"))
+            html = res.get_data(as_text=True) if hasattr(res, 'get_data') else str(res)
+            self.assertIn("/portal", html)
+            self.assertIn("/portal/logout", html)
+            self.assertIn("Desconectar do Portal do Cliente", html)
+
 
 if __name__ == '__main__':
     unittest.main()

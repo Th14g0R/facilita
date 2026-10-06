@@ -198,11 +198,24 @@ def create_app() -> Flask:
             if is_debug else
             "<p style='color:#7f1d1d; font-size:14px; margin-bottom:1.5rem;'>Ocorreu uma instabilidade momentânea no processamento. A ocorrência foi registrada de forma segura nos logs do sistema.</p>"
         )
+        is_portal = request.path.startswith('/portal') or session.get('cliente_acesso_id') is not None
+        if is_portal:
+            voltar_url = "/portal"
+            logout_url = "/portal/logout"
+            logout_label = "Desconectar do Portal do Cliente"
+        else:
+            voltar_url = "/dashboard"
+            logout_url = "/logout"
+            logout_label = "Desconectar da Área Administrativa"
+
         return (
             "<div style='font-family:system-ui,-apple-system,sans-serif; padding:2rem; max-width:860px; margin:2rem auto; border:1px solid #fca5a5; border-radius:8px; background:#fef2f2;'>"
             "<h2 style='color:#b91c1c; margin-top:0;'>Erro interno ao carregar a página</h2>"
             f"{detalhes_html}"
-            "<p><a href='/dashboard' style='color:#2563eb; text-decoration:underline;'>← Voltar para o início</a></p>"
+            "<div style='display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:1.5rem;'>"
+            f"<a href='{voltar_url}' style='display:inline-block; padding:8px 16px; background:#2563eb; color:#ffffff; border-radius:6px; text-decoration:none; font-weight:500;'>← Voltar para o início</a>"
+            f"<a href='{logout_url}' style='display:inline-block; padding:8px 16px; background:#ffffff; color:#dc2626; border:1px solid #fca5a5; border-radius:6px; text-decoration:none; font-weight:500;'>{logout_label}</a>"
+            "</div>"
             "</div>",
             500,
         )
@@ -1947,6 +1960,9 @@ def register_routes(app: Flask) -> None:
         if g.usuario is not None:
             return redirect(url_for("dashboard"))
 
+        if getattr(g, "portal_access", None) is not None:
+            return redirect(url_for("portal.dashboard"))
+
         if request.method == "POST":
             login_usuario = request.form.get("login", "").strip().lower()
             senha = request.form.get("senha", "")
@@ -2041,10 +2057,11 @@ def register_routes(app: Flask) -> None:
 
         return render_template("login.html")
 
-    @app.post("/logout")
-    @login_required
+    @app.route("/logout", methods=["GET", "POST"])
     def logout():
-        session.clear()
+        session.pop("usuario_id", None)
+        if "cliente_acesso_id" not in session:
+            session.clear()
         flash("Sessão encerrada.", "success")
         return redirect(url_for("login"))
 
@@ -2465,15 +2482,21 @@ def register_routes(app: Flask) -> None:
             SELECT e.id, e.descricao, e.data_emprestimo, e.valor_original_centavos,
                    e.saldo_atual_centavos, e.taxa_juros_mensal,
                    e.data_primeiro_vencimento, e.status,
-                   MAX(
-                       COALESCE((
+                   CASE
+                       WHEN COALESCE((
                             SELECT SUM(m.valor_centavos)
                               FROM movimentacoes_emprestimo m
                              WHERE m.emprestimo_id = e.id
                                AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
-                       ), 0),
-                       e.valor_original_centavos - e.saldo_atual_centavos
-                   ) AS total_amortizado_centavos
+                       ), 0) >= (e.valor_original_centavos - e.saldo_atual_centavos)
+                       THEN COALESCE((
+                            SELECT SUM(m.valor_centavos)
+                              FROM movimentacoes_emprestimo m
+                             WHERE m.emprestimo_id = e.id
+                               AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
+                       ), 0)
+                       ELSE (e.valor_original_centavos - e.saldo_atual_centavos)
+                   END AS total_amortizado_centavos
               FROM emprestimos e
              WHERE e.cliente_id = ?
              ORDER BY e.id DESC
@@ -5966,15 +5989,21 @@ def posicao_emprestimos_cliente(
                e.valor_original_centavos, e.saldo_atual_centavos,
                e.taxa_juros_mensal, e.data_primeiro_vencimento,
                e.dia_vencimento, e.status,
-               MAX(
-                   COALESCE((
+               CASE
+                   WHEN COALESCE((
                         SELECT SUM(m.valor_centavos)
                           FROM movimentacoes_emprestimo m
                          WHERE m.emprestimo_id = e.id
                            AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
-                   ), 0),
-                   e.valor_original_centavos - e.saldo_atual_centavos
-               ) AS total_amortizado_centavos,
+                   ), 0) >= (e.valor_original_centavos - e.saldo_atual_centavos)
+                   THEN COALESCE((
+                        SELECT SUM(m.valor_centavos)
+                          FROM movimentacoes_emprestimo m
+                         WHERE m.emprestimo_id = e.id
+                           AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
+                   ), 0)
+                   ELSE (e.valor_original_centavos - e.saldo_atual_centavos)
+               END AS total_amortizado_centavos,
                COALESCE((
                     SELECT SUM(t.valor_previsto_centavos)
                       FROM titulos_receber t
