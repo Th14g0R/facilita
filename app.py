@@ -2462,12 +2462,21 @@ def register_routes(app: Flask) -> None:
         db = get_db()
         emprestimos = db.execute(
             """
-            SELECT id, descricao, data_emprestimo, valor_original_centavos,
-                   saldo_atual_centavos, taxa_juros_mensal,
-                   data_primeiro_vencimento, status
-              FROM emprestimos
-             WHERE cliente_id = ?
-             ORDER BY id DESC
+            SELECT e.id, e.descricao, e.data_emprestimo, e.valor_original_centavos,
+                   e.saldo_atual_centavos, e.taxa_juros_mensal,
+                   e.data_primeiro_vencimento, e.status,
+                   MAX(
+                       COALESCE((
+                            SELECT SUM(m.valor_centavos)
+                              FROM movimentacoes_emprestimo m
+                             WHERE m.emprestimo_id = e.id
+                               AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
+                       ), 0),
+                       e.valor_original_centavos - e.saldo_atual_centavos
+                   ) AS total_amortizado_centavos
+              FROM emprestimos e
+             WHERE e.cliente_id = ?
+             ORDER BY e.id DESC
             """,
             (cliente_id,),
         ).fetchall()
@@ -5957,6 +5966,15 @@ def posicao_emprestimos_cliente(
                e.valor_original_centavos, e.saldo_atual_centavos,
                e.taxa_juros_mensal, e.data_primeiro_vencimento,
                e.dia_vencimento, e.status,
+               MAX(
+                   COALESCE((
+                        SELECT SUM(m.valor_centavos)
+                          FROM movimentacoes_emprestimo m
+                         WHERE m.emprestimo_id = e.id
+                           AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
+                   ), 0),
+                   e.valor_original_centavos - e.saldo_atual_centavos
+               ) AS total_amortizado_centavos,
                COALESCE((
                     SELECT SUM(t.valor_previsto_centavos)
                       FROM titulos_receber t

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.4.3 — 2026-10-05
+
+- **Painel "Minha Visão Geral" & Somatório de Contratos**:
+  - Somatório total de contratos realizados (quantidade e valor total).
+  - Indicadores destacados de contratos ativos (quantidade e saldo restante) e quitados/inativos.
+  - Somatório total amortizado e cálculo do **valor líquido** dos contratos (deduzindo do total contratado os valores amortizados dos quitados e inativos).
+  - Tabela "Meus contratos" exibindo a data em que o contrato foi realizado e o recurso transferido ao cliente (`data_emprestimo`), valor original acordado, total amortizado de cada contrato, saldo restante e situação com badges de status.
+- **Filtro Inteligente de "Próximos Pagamentos"**:
+  - Exibição focada nas pendências prioritárias: títulos vencidos/atrasados e pagamentos pendentes do mês vigente.
+  - Alerta/botão convidativo "Ver mais no extrato" contabilizando os pagamentos dos próximos meses e direcionando o cliente diretamente para o extrato completo.
+- **Correção e Leitura de Cartões de Crédito no Portal do Cliente**:
+  - Correção na consulta de resumo de cartões (`card_summaries`): valores de `pago_centavos`, `aberto_centavos` e `total_parcelado_centavos` devidamente calculados e sincronizados, corrigindo a exibição de dados zerados.
+  - Nova tabela "O que foi comprado", exibindo compras no cartão, datas, quantidade de parcelas, parcelas pagas/abertas e valor total.
+  - Nova tabela de parcelas (abertas e pagas) com datas de vencimento, pagamentos e situações.
+  - Nova rota dedicada em modo de apenas leitura (`/portal/cartoes/<id>`), permitindo consultar detalhes individuais do cartão sem permitir alterações externas.
+- **Detalhamento de Contratos no Extrato do Cliente**:
+  - Nova seção "Detalhamento dos Contratos" no extrato financeiro, informando contrato, data de contratação/transferência, valor acordado, total amortizado e saldo restante com rodapé somatório.
+  - Somatórios dos valores pagos ao Facilita tanto no período quanto no acumulado histórico (distinguindo amortizações de capital e taxas de compensação).
+- **Cadastro do Cliente (Visão Administrativa)**:
+  - Tabela de operações e contratos no cadastro do cliente enriquecida com a data de contratação e total amortizado.
+- **Suíte de Testes Automatizados**: ampliação para 194 testes unitários automatizados com 100% de sucesso.
+
 ## 2.4.2 — 2026-10-05
 
 - **Visualização de Comprovantes em Modal Pop-up (sem erro 404)**:

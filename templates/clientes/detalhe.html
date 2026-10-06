@@ -40,7 +40,7 @@
 {% endif %}
 </section>
 <section class="panel">
-<h2>Operações e Contratos</h2>{{ table(emprestimos,[('id','Contrato'),('valor_original_centavos','Valor acordado'),('saldo_atual_centavos','Saldo em aberto'),('status','Situação')],'emprestimos_detalhe','emprestimo_id') }}</section>
+<h2>Operações e Contratos</h2>{{ table(emprestimos,[('id','Contrato'),('data_emprestimo','Contratado'),('valor_original_centavos','Valor acordado'),('total_amortizado_centavos','Total amortizado'),('saldo_atual_centavos','Saldo em aberto'),('status','Situação')],'emprestimos_detalhe','emprestimo_id') }}</section>
 <section class="panel">
 <h2>Contas bancárias</h2>{{ table(contas_bancarias,[('banco','Banco'),('chave_pix','PIX')],'contas_editar','conta_id') }}</section>
 <section class="panel">

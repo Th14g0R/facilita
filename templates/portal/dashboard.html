@@ -1,16 +1,435 @@
-{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}Minha visão geral{% endblock %}{% block content %}<header class="page-heading">
-<div>
-<p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>Minha visão geral</h1>
-</div>
-<div class="actions">
-<a class="button primary" href="{{ url_for('portal.new_proof') }}">Enviar comprovante</a>
-</div>
+{% extends 'base.html' %}
+{% from '_macros.html' import csrf, table with context %}
+{% block title %}Minha visão geral{% endblock %}
+
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">CONTROLE FINANCEIRO</p>
+    <h1>Minha visão geral</h1>
+  </div>
+  <div class="actions">
+    <a class="button" href="{{ url_for('portal.statement') }}">Ver extrato completo</a>
+    <a class="button primary" href="{{ url_for('portal.new_proof') }}">Enviar comprovante</a>
+  </div>
 </header>
-<section class="panel">
-<h2>Meus contratos</h2>{{ table(emprestimos,[('id','Contrato'),('valor_original_centavos','Valor acordado'),('saldo_atual_centavos','Saldo restante'),('status','Situação')]) }}</section>
-<section class="panel">
-<h2>Próximos pagamentos</h2>{{ table(titulos,[('emprestimo_id','Contrato'),('competencia','Competência'),('data_vencimento','Vencimento'),('valor_previsto_centavos','Valor'),('status','Situação')]) }}</section>
-<section class="panel">
-<h2>Meus cartões</h2>{{ table(cartoes,[('descricao','Cartão'),('aberto_centavos','Em aberto'),('pago_centavos','Pago')]) }}</section>{% endblock %}
+
+<!-- Somatórios e Indicadores Gerais de Contratos -->
+<section class="panel" style="margin-bottom: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
+    <h2 style="margin: 0;">Resumo dos Meus Contratos</h2>
+    <span class="muted" style="font-size: 13px;">
+      Total: <strong>{{ metricas_contratos.total_contratos_qtd }}</strong> contrato(s) registrado(s)
+    </span>
+  </div>
+
+  <div class="extrato-summary-grid" style="margin-top: 0; margin-bottom: 16px;">
+    <!-- Somatório Total dos Contratos -->
+    <div class="extrato-summary-card card-recebido">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+          <line x1="2" y1="10" x2="22" y2="10"></line>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Total dos Contratos ({{ metricas_contratos.total_contratos_qtd }})</span>
+        <strong class="extrato-summary-val valor-recebido money">{{ metricas_contratos.total_contratos_centavos|money }}</strong>
+      </div>
+    </div>
+
+    <!-- Somatório dos Ativos -->
+    <div class="extrato-summary-card card-aberto">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Ativos ({{ metricas_contratos.ativos_qtd }}) · Saldo Restante</span>
+        <strong class="extrato-summary-val money">{{ metricas_contratos.ativos_saldo_centavos|money }}</strong>
+      </div>
+    </div>
+
+    <!-- Somatório dos Amortizados -->
+    <div class="extrato-summary-card card-pago">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Total Amortizado</span>
+        <strong class="extrato-summary-val valor-pago money">{{ metricas_contratos.total_amortizado_centavos|money }}</strong>
+      </div>
+    </div>
+
+    <!-- Somatório dos Quitados / Inativos -->
+    <div class="extrato-summary-card" style="border-left: 4px solid #64748b;">
+      <div class="extrato-summary-icon" style="background: rgba(100, 116, 139, 0.12); color: #64748b;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Quitados / Inativos ({{ metricas_contratos.quitados_qtd }})</span>
+        <strong class="extrato-summary-val money">{{ metricas_contratos.quitados_centavos|money }}</strong>
+      </div>
+    </div>
+
+    <!-- Líquido Restante (Deduz os amortizados dos quitados e inativos) -->
+    <div class="extrato-summary-card" style="border-left: 4px solid #0284c7; grid-column: 1 / -1;">
+      <div class="extrato-summary-icon" style="background: rgba(2, 132, 199, 0.12); color: #0284c7;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Valor Líquido dos Contratos (Total deduzido dos quitados e amortizados)</span>
+        <strong class="extrato-summary-val money" style="color: #0284c7;">{{ metricas_contratos.liquido_centavos|money }}</strong>
+        <span class="muted" style="display: block; font-size: 11.5px; margin-top: 2px;">
+          Amortizado em quitados: {{ metricas_contratos.quitados_amortizado_centavos|money }} · Saldo devedor principal ativo: {{ metricas_contratos.ativos_saldo_centavos|money }}
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Bloco [Meus contratos] -->
+<section class="panel" style="margin-bottom: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">
+    <h2 style="margin: 0;">Meus contratos</h2>
+    <span class="muted" style="font-size: 13px;">Data da contratação / transferência e amortização por contrato</span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Contrato</th>
+          <th scope="col">Data Contratação / Transferência</th>
+          <th scope="col" class="money" style="text-align: right;">Valor Acordado</th>
+          <th scope="col" class="money" style="text-align: right;">Total Amortizado</th>
+          <th scope="col" class="money" style="text-align: right;">Saldo Restante</th>
+          <th scope="col" style="text-align: center;">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in emprestimos %}
+          <tr>
+            <td style="font-weight: 500;">
+              #{{ e.id }}
+              {% if e.descricao %}
+                <span class="muted" style="font-size: 12px; margin-left: 4px;">({{ e.descricao }})</span>
+              {% endif %}
+            </td>
+            <td>
+              <span>{{ e.data_emprestimo|date_br }}</span>
+              <span class="muted" style="display: block; font-size: 11px;">Transferido ao cliente</span>
+            </td>
+            <td class="money" style="text-align: right;">
+              {{ e.valor_original_centavos|money }}
+            </td>
+            <td class="money" style="text-align: right;">
+              <span class="valor-pago" style="font-weight: 600;">
+                {{ e.total_amortizado_centavos|money }}
+              </span>
+            </td>
+            <td class="money" style="text-align: right;">
+              <strong>{{ e.saldo_atual_centavos|money }}</strong>
+            </td>
+            <td style="text-align: center;">
+              {% if e.status == 'ATIVO' %}
+                <span class="badge ativo">Ativo</span>
+              {% else %}
+                <span class="badge pago">Quitado</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="6">
+              <div class="empty">Nenhum contrato cadastrado.</div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      {% if emprestimos %}
+        <tfoot>
+          <tr style="font-weight: 600; border-top: 2px solid var(--line);">
+            <td colspan="2" style="text-align: right;"><strong>Totais:</strong></td>
+            <td class="money" style="text-align: right;"><strong>{{ metricas_contratos.total_contratos_centavos|money }}</strong></td>
+            <td class="money" style="text-align: right;"><strong class="valor-pago">{{ metricas_contratos.total_amortizado_centavos|money }}</strong></td>
+            <td class="money" style="text-align: right;"><strong>{{ metricas_contratos.ativos_saldo_centavos|money }}</strong></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</section>
+
+<!-- Bloco [Próximos pagamentos] -->
+<section class="panel" style="margin-bottom: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">
+    <div>
+      <h2 style="margin: 0;">Próximos pagamentos</h2>
+      <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">
+        Exibindo vencidos e pendências do mês vigente.
+      </p>
+    </div>
+    {% if titulos_futuros_qtd > 0 %}
+      <a class="button" href="{{ url_for('portal.statement') }}" style="font-size: 13px;">
+        Ver mais no extrato ({{ titulos_futuros_qtd }} futuros) →
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Contrato</th>
+          <th scope="col">Competência</th>
+          <th scope="col">Vencimento</th>
+          <th scope="col" class="money" style="text-align: right;">Valor</th>
+          <th scope="col" style="text-align: center;">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in titulos %}
+          <tr>
+            <td style="font-weight: 500;">
+              #{{ t.emprestimo_id }}
+              {% if t.emprestimo_descricao %}
+                <span class="muted" style="font-size: 12px; margin-left: 4px;">({{ t.emprestimo_descricao }})</span>
+              {% endif %}
+            </td>
+            <td>{{ t.competencia|competencia_br }}</td>
+            <td><strong>{{ t.data_vencimento|date_br }}</strong></td>
+            <td class="money" style="text-align: right;">
+              <strong>{{ t.valor_previsto_centavos|money }}</strong>
+            </td>
+            <td style="text-align: center;">
+              {% if t.status == 'VENCIDO' %}
+                <span class="badge vencido">Atrasado</span>
+              {% else %}
+                <span class="badge previsto">Pendente (mês atual)</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="5">
+              <div class="empty" style="padding: 24px;">
+                🎉 <strong>Tudo em dia para este mês!</strong><br>
+                Nenhum pagamento vencido ou pendente no mês vigente.
+                {% if titulos_futuros_qtd > 0 %}
+                  <div style="margin-top: 10px;">
+                    <a href="{{ url_for('portal.statement') }}" class="button">Ver parcelas dos próximos meses no extrato</a>
+                  </div>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if titulos_futuros_qtd > 0 %}
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; padding: 12px 16px; border-radius: var(--radius); background: var(--surface-hover); border: 1px dashed var(--line);">
+      <span style="font-size: 13px;">
+        📅 Existem outros <strong>{{ titulos_futuros_qtd }} pagamento(s)</strong> previstos para os próximos meses (totalizando <strong>{{ titulos_futuros_centavos|money }}</strong>).
+      </span>
+      <a href="{{ url_for('portal.statement') }}" class="button primary" style="font-size: 12px; padding: 6px 14px;">
+        Ver mais no extrato →
+      </a>
+    </div>
+  {% endif %}
+</section>
+
+<!-- Bloco [Meus cartões] -->
+<section class="panel" style="margin-bottom: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">
+    <div>
+      <h2 style="margin: 0;">Meus cartões</h2>
+      <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">
+        Movimentos realizados nos cartões vinculados a você · Modo somente leitura
+      </p>
+    </div>
+    <span class="badge" style="background: rgba(14, 165, 233, 0.1); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.25); font-size: 12px; padding: 4px 10px;">
+      Somente leitura
+    </span>
+  </div>
+
+  {% if cartoes %}
+    <!-- Resumo Geral dos Cartões -->
+    <div class="extrato-summary-grid" style="margin-top: 0; margin-bottom: 18px;">
+      <div class="extrato-summary-card card-aberto">
+        <div class="extrato-summary-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        </div>
+        <div>
+          <span class="extrato-summary-label">Total Comprado / Parcelado</span>
+          <strong class="extrato-summary-val money">{{ cartoes_metricas.total_centavos|money }}</strong>
+        </div>
+      </div>
+
+      <div class="extrato-summary-card card-recebido">
+        <div class="extrato-summary-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <div>
+          <span class="extrato-summary-label">Total Já Pago</span>
+          <strong class="extrato-summary-val valor-recebido money">{{ cartoes_metricas.pago_centavos|money }}</strong>
+        </div>
+      </div>
+
+      <div class="extrato-summary-card card-pago">
+        <div class="extrato-summary-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <div>
+          <span class="extrato-summary-label">Total em Aberto</span>
+          <strong class="extrato-summary-val valor-pago money">{{ cartoes_metricas.aberto_centavos|money }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela dos Cartões do Cliente -->
+    <h3 style="font-size: 15px; margin-bottom: 10px;">Cartões Vinculados</h3>
+    <div class="table-wrap" style="margin-bottom: 22px;">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Cartão</th>
+            <th scope="col">Dia Vencimento</th>
+            <th scope="col" class="money" style="text-align: right;">Total Parcelado</th>
+            <th scope="col" class="money" style="text-align: right;">Já Pago</th>
+            <th scope="col" class="money" style="text-align: right;">Em Aberto</th>
+            <th scope="col" style="text-align: center;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in cartoes %}
+            <tr>
+              <td style="font-weight: 500;">
+                {{ c.descricao }}
+                {% if not c.ativo %}
+                  <span class="badge inativo" style="font-size: 11px; margin-left: 4px;">Inativo</span>
+                {% endif %}
+              </td>
+              <td>Dia {{ c.dia_vencimento or '—' }}</td>
+              <td class="money" style="text-align: right;">{{ c.total_parcelado_centavos|money }}</td>
+              <td class="money" style="text-align: right;"><span class="valor-recebido">{{ c.pago_centavos|money }}</span></td>
+              <td class="money" style="text-align: right;"><strong class="valor-pago">{{ c.aberto_centavos|money }}</strong></td>
+              <td style="text-align: center;">
+                <a href="{{ url_for('portal.card_detail', cartao_id=c.id) }}" style="font-size: 13px;">Ver detalhes →</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Compras / O que foi comprado -->
+    <h3 style="font-size: 15px; margin-bottom: 10px;">O que foi comprado</h3>
+    <div class="table-wrap" style="margin-bottom: 22px;">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Data</th>
+            <th scope="col">Compra / Descrição</th>
+            <th scope="col">Cartão</th>
+            <th scope="col">Parcelas</th>
+            <th scope="col" class="money" style="text-align: right;">Valor Pago</th>
+            <th scope="col" class="money" style="text-align: right;">Em Aberto</th>
+            <th scope="col" class="money" style="text-align: right;">Valor Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lc in compras_cartao %}
+            <tr>
+              <td>{{ lc.data_compra|date_br }}</td>
+              <td style="font-weight: 500;">{{ lc.compra_descricao }}</td>
+              <td><span class="muted">{{ lc.cartao_descricao }}</span></td>
+              <td>
+                <span class="badge {{ 'pago' if lc.parcelas_pagas == lc.quantidade_parcelas else 'ativo' }}">
+                  {{ lc.parcelas_pagas }} de {{ lc.quantidade_parcelas }} pagas
+                </span>
+              </td>
+              <td class="money" style="text-align: right;"><span class="valor-recebido">{{ lc.valor_pago_centavos|money }}</span></td>
+              <td class="money" style="text-align: right;"><span class="valor-pago">{{ lc.valor_aberto_centavos|money }}</span></td>
+              <td class="money" style="text-align: right;"><strong>{{ lc.valor_total_centavos|money }}</strong></td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7">
+                <div class="empty">Nenhuma compra registrada nos cartões.</div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Parcelas (Abertas e Pagas) -->
+    <h3 style="font-size: 15px; margin-bottom: 10px;">Parcelas dos Cartões</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Parcela</th>
+            <th scope="col">Compra</th>
+            <th scope="col">Cartão</th>
+            <th scope="col">Vencimento</th>
+            <th scope="col">Situação</th>
+            <th scope="col" class="money" style="text-align: right;">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in parcelas_cartao %}
+            <tr>
+              <td><strong>{{ p.numero_parcela }}ª</strong> de {{ p.quantidade_parcelas }}</td>
+              <td style="font-weight: 500;">{{ p.lancamento_descricao }}</td>
+              <td><span class="muted">{{ p.cartao_descricao }}</span></td>
+              <td>{{ p.vencimento|date_br }}</td>
+              <td>
+                {% if p.status == 'PAGO' %}
+                  <span class="badge pago">Paga ({{ p.data_pagamento|date_br if p.data_pagamento else 'Sim' }})</span>
+                {% elif p.status == 'VENCIDO' %}
+                  <span class="badge vencido">Atrasada</span>
+                {% else %}
+                  <span class="badge previsto">Em aberto</span>
+                {% endif %}
+              </td>
+              <td class="money" style="text-align: right;">
+                <strong>{{ p.valor_centavos|money }}</strong>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6">
+                <div class="empty">Nenhuma parcela registrada nos cartões.</div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  {% else %}
+    <div class="empty" style="padding: 24px;">
+      Nenhum cartão vinculado no momento.
+    </div>
+  {% endif %}
+
+  <p class="muted" style="margin-top: 14px; font-size: 12px;">
+    ℹ️ Todos os dados de cartão são exibidos apenas para consulta do cliente. Quaisquer alterações, compras e liquidações são gerenciadas pelo administrador do Facilita.
+  </p>
+</section>
+{% endblock %}

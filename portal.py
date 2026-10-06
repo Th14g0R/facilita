@@ -314,20 +314,91 @@ def validate_file(storage):
     return optimized, '.jpg', 'image/jpeg', optimized_name
 
 
-def card_summaries(client_id):
-    db=get_db(); refresh_overdue_card_installments(db)
+def card_summaries(client_id: int):
+    db = get_db()
+    refresh_overdue_card_installments(db)
     return db.execute("""
-        SELECT cc.id,cc.descricao,cc.ativo,
-               COALESCE(cc.dia_vencimento, CAST(SUBSTR(MIN(pc.vencimento), 9, 2) AS INTEGER)) dia_vencimento,
-               COALESCE(SUM(pc.valor_centavos),0) total_emprestado_centavos,
-               COUNT(pc.id) parcelas_totais,
-               COALESCE(SUM(CASE WHEN pc.status='PAGO' THEN 1 ELSE 0 END),0) parcelas_pagas,
-               COALESCE(SUM(CASE WHEN pc.status IN ('PENDENTE','VENCIDO') THEN pc.valor_centavos ELSE 0 END),0) valor_em_aberto_centavos
+        SELECT cc.id, cc.descricao, cc.ativo,
+               COALESCE(cc.dia_vencimento, CAST(SUBSTR(MIN(pc.vencimento), 9, 2) AS INTEGER)) AS dia_vencimento,
+               COALESCE(SUM(pc.valor_centavos), 0) AS total_parcelado_centavos,
+               COALESCE(SUM(pc.valor_centavos), 0) AS total_centavos,
+               COUNT(pc.id) AS parcelas_totais,
+               COALESCE(SUM(CASE WHEN pc.status = 'PAGO' THEN 1 ELSE 0 END), 0) AS parcelas_pagas,
+               COALESCE(SUM(CASE WHEN pc.status = 'PAGO' THEN pc.valor_centavos ELSE 0 END), 0) AS pago_centavos,
+               COALESCE(SUM(CASE WHEN pc.status IN ('PENDENTE', 'VENCIDO') THEN 1 ELSE 0 END), 0) AS parcelas_abertas,
+               COALESCE(SUM(CASE WHEN pc.status IN ('PENDENTE', 'VENCIDO') THEN pc.valor_centavos ELSE 0 END), 0) AS aberto_centavos,
+               COALESCE(SUM(CASE WHEN pc.status IN ('PENDENTE', 'VENCIDO') THEN pc.valor_centavos ELSE 0 END), 0) AS valor_em_aberto_centavos,
+               COALESCE(SUM(CASE WHEN pc.status = 'VENCIDO' THEN pc.valor_centavos ELSE 0 END), 0) AS vencido_centavos
           FROM cartoes_credito cc
-          LEFT JOIN lancamentos_cartao lc ON lc.cartao_credito_id=cc.id
-          LEFT JOIN parcelas_cartao pc ON pc.lancamento_cartao_id=lc.id
-         WHERE cc.cliente_id=? GROUP BY cc.id, cc.descricao, cc.ativo, cc.dia_vencimento ORDER BY cc.ativo DESC,cc.id DESC
-    """,(client_id,)).fetchall()
+          LEFT JOIN lancamentos_cartao lc ON lc.cartao_credito_id = cc.id
+          LEFT JOIN parcelas_cartao pc ON pc.lancamento_cartao_id = lc.id
+         WHERE cc.cliente_id = ?
+         GROUP BY cc.id, cc.descricao, cc.ativo, cc.dia_vencimento
+         ORDER BY cc.ativo DESC, cc.id DESC
+    """, (client_id,)).fetchall()
+
+
+def client_card_purchases(client_id: int):
+    """Retorna todas as compras realizadas nos cartões vinculados ao cliente."""
+    db = get_db()
+    return db.execute("""
+        SELECT lc.id, lc.cartao_credito_id, cc.descricao AS cartao_descricao,
+               lc.descricao AS compra_descricao, lc.valor_total_centavos,
+               lc.quantidade_parcelas, lc.data_compra,
+               (
+                   SELECT MIN(pc.vencimento)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+               ) AS primeiro_vencimento,
+               (
+                   SELECT COUNT(*)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+                      AND pc.status = 'PAGO'
+               ) AS parcelas_pagas,
+               (
+                   SELECT COUNT(*)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+                      AND pc.status IN ('PENDENTE', 'VENCIDO')
+               ) AS parcelas_abertas,
+               (
+                   SELECT COALESCE(SUM(pc.valor_centavos), 0)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+                      AND pc.status = 'PAGO'
+               ) AS valor_pago_centavos,
+               (
+                   SELECT COALESCE(SUM(pc.valor_centavos), 0)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+                      AND pc.status IN ('PENDENTE', 'VENCIDO')
+               ) AS valor_aberto_centavos
+          FROM lancamentos_cartao lc
+          JOIN cartoes_credito cc ON cc.id = lc.cartao_credito_id
+         WHERE cc.cliente_id = ?
+         ORDER BY lc.data_compra DESC, lc.id DESC
+    """, (client_id,)).fetchall()
+
+
+def client_card_installments(client_id: int):
+    """Retorna todas as parcelas dos cartões do cliente, ordenadas por prioridade de vencimento."""
+    db = get_db()
+    refresh_overdue_card_installments(db)
+    return db.execute("""
+        SELECT pc.id, pc.numero_parcela, pc.valor_centavos, pc.vencimento,
+               pc.data_pagamento, pc.status,
+               lc.descricao AS lancamento_descricao, lc.quantidade_parcelas,
+               cc.descricao AS cartao_descricao, cc.id AS cartao_credito_id
+          FROM parcelas_cartao pc
+          JOIN lancamentos_cartao lc ON lc.id = pc.lancamento_cartao_id
+          JOIN cartoes_credito cc ON cc.id = lc.cartao_credito_id
+         WHERE cc.cliente_id = ?
+         ORDER BY
+               CASE WHEN pc.status = 'VENCIDO' THEN 0 WHEN pc.status = 'PENDENTE' THEN 1 ELSE 2 END,
+               pc.vencimento,
+               pc.id
+    """, (client_id,)).fetchall()
 
 
 @bp.before_app_request
@@ -911,7 +982,216 @@ def perfil():
 @bp.get('/portal')
 @portal_required
 def dashboard():
-    db=get_db(); cid=int(g.portal_access['cliente_id']); sync_receivable_titles(db); resumo=resumo_financeiro_cliente(db,cid); loans=posicao_emprestimos_cliente(db,cid); cards=card_summaries(cid); titles=db.execute("SELECT t.id,t.competencia,t.data_vencimento,t.valor_previsto_centavos,t.status,t.natureza,e.id emprestimo_id,e.descricao emprestimo_descricao FROM titulos_receber t JOIN emprestimos e ON e.id=t.emprestimo_id WHERE e.cliente_id=? AND t.status IN ('PREVISTO','VENCIDO') ORDER BY t.data_vencimento,e.id,t.id",(cid,)).fetchall(); proofs=db.execute("SELECT id,data_pagamento,valor_total_centavos,status,created_at FROM comprovantes_pagamento WHERE cliente_id=? ORDER BY created_at DESC,id DESC LIMIT 10",(cid,)).fetchall(); return render_template('portal/dashboard.html',resumo=resumo,emprestimos=loans,cartoes=cards,titulos=titles,comprovantes=proofs)
+    db = get_db()
+    cid = int(g.portal_access['cliente_id'])
+    sync_receivable_titles(db)
+    refresh_overdue_card_installments(db)
+
+    today = hoje_brasil()
+    if today.month == 12:
+        next_month_start = date(today.year + 1, 1, 1)
+    else:
+        next_month_start = date(today.year, today.month + 1, 1)
+    fim_mes_vigente = (next_month_start - timedelta(days=1)).isoformat()
+    hoje_iso = today.isoformat()
+
+    resumo = resumo_financeiro_cliente(db, cid)
+    loans = posicao_emprestimos_cliente(db, cid)
+
+    # Métricas e somatórios de Contratos
+    total_contratos_qtd = len(loans)
+    total_contratos_centavos = sum(c['valor_original_centavos'] for c in loans)
+    ativos_qtd = sum(1 for c in loans if c['status'] == 'ATIVO')
+    ativos_saldo_centavos = sum(c['saldo_atual_centavos'] for c in loans if c['status'] == 'ATIVO')
+    ativos_original_centavos = sum(c['valor_original_centavos'] for c in loans if c['status'] == 'ATIVO')
+
+    total_amortizado_centavos = sum(c['total_amortizado_centavos'] for c in loans)
+    amortizado_ativos_centavos = sum(c['total_amortizado_centavos'] for c in loans if c['status'] == 'ATIVO')
+    quitados_qtd = sum(1 for c in loans if c['status'] != 'ATIVO')
+    quitados_centavos = sum(c['valor_original_centavos'] for c in loans if c['status'] != 'ATIVO')
+    quitados_amortizado_centavos = sum(c['total_amortizado_centavos'] for c in loans if c['status'] != 'ATIVO')
+
+    # Líquido que deduz do total os valores amortizados dos quitados e inativos
+    liquido_centavos = total_contratos_centavos - quitados_amortizado_centavos
+
+    metricas_contratos = {
+        'total_contratos_qtd': total_contratos_qtd,
+        'total_contratos_centavos': total_contratos_centavos,
+        'ativos_qtd': ativos_qtd,
+        'ativos_saldo_centavos': ativos_saldo_centavos,
+        'ativos_original_centavos': ativos_original_centavos,
+        'total_amortizado_centavos': total_amortizado_centavos,
+        'amortizado_ativos_centavos': amortizado_ativos_centavos,
+        'quitados_qtd': quitados_qtd,
+        'quitados_centavos': quitados_centavos,
+        'quitados_amortizado_centavos': quitados_amortizado_centavos,
+        'liquido_centavos': liquido_centavos,
+    }
+
+    # Próximos Pagamentos: vencidos e pendentes do mês vigente
+    all_open_titles = db.execute(
+        """
+        SELECT t.id, t.competencia, t.data_vencimento, t.valor_previsto_centavos,
+               t.status, t.natureza, e.id AS emprestimo_id, e.descricao AS emprestimo_descricao
+          FROM titulos_receber t
+          JOIN emprestimos e ON e.id = t.emprestimo_id
+         WHERE e.cliente_id = ?
+           AND t.status IN ('PREVISTO', 'VENCIDO')
+         ORDER BY t.data_vencimento, e.id, t.id
+        """,
+        (cid,),
+    ).fetchall()
+
+    titulos_mes_vigente = []
+    titulos_futuros_qtd = 0
+    titulos_futuros_centavos = 0
+
+    for t in all_open_titles:
+        venc = str(t['data_vencimento'] or '')
+        stat = str(t['status'] or '').upper()
+        if stat == 'VENCIDO' or venc < hoje_iso or venc <= fim_mes_vigente:
+            titulos_mes_vigente.append(t)
+        else:
+            titulos_futuros_qtd += 1
+            titulos_futuros_centavos += int(t['valor_previsto_centavos'] or 0)
+
+    # Cartões de Crédito e Movimentações
+    cards = card_summaries(cid)
+    compras_cartao = client_card_purchases(cid)
+    parcelas_cartao = client_card_installments(cid)
+
+    cartoes_total_parcelado = sum(c['total_parcelado_centavos'] for c in cards)
+    cartoes_total_pago = sum(c['pago_centavos'] for c in cards)
+    cartoes_total_aberto = sum(c['aberto_centavos'] for c in cards)
+
+    cartoes_metricas = {
+        'total_centavos': cartoes_total_parcelado,
+        'pago_centavos': cartoes_total_pago,
+        'aberto_centavos': cartoes_total_aberto,
+    }
+
+    proofs = db.execute(
+        """
+        SELECT id, data_pagamento, valor_total_centavos, status, created_at
+          FROM comprovantes_pagamento
+         WHERE cliente_id = ?
+         ORDER BY created_at DESC, id DESC
+         LIMIT 10
+        """,
+        (cid,),
+    ).fetchall()
+
+    return render_template(
+        'portal/dashboard.html',
+        resumo=resumo,
+        emprestimos=loans,
+        metricas_contratos=metricas_contratos,
+        titulos=titulos_mes_vigente,
+        titulos_futuros_qtd=titulos_futuros_qtd,
+        titulos_futuros_centavos=titulos_futuros_centavos,
+        cartoes=cards,
+        compras_cartao=compras_cartao,
+        parcelas_cartao=parcelas_cartao,
+        cartoes_metricas=cartoes_metricas,
+        comprovantes=proofs,
+    )
+
+
+@bp.get('/portal/cartoes/<int:cartao_id>')
+@portal_required
+def card_detail(cartao_id: int):
+    """Visualização em modo somente leitura dos detalhes do cartão pelo cliente."""
+    db = get_db()
+    cid = int(g.portal_access['cliente_id'])
+    refresh_overdue_card_installments(db)
+    cartao = db.execute(
+        """
+        SELECT cc.*, c.nome AS cliente_nome, c.id AS cliente_id
+          FROM cartoes_credito cc
+          JOIN clientes c ON c.id = cc.cliente_id
+         WHERE cc.id = ? AND cc.cliente_id = ?
+        """,
+        (cartao_id, cid),
+    ).fetchone()
+    if cartao is None:
+        abort(404)
+
+    lancamentos = db.execute(
+        """
+        SELECT lc.id, lc.descricao, lc.valor_total_centavos, lc.quantidade_parcelas,
+               lc.data_compra,
+               (
+                   SELECT MIN(pc.vencimento)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+               ) AS primeiro_vencimento,
+               (
+                   SELECT COUNT(*)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+                      AND pc.status = 'PAGO'
+               ) AS parcelas_pagas,
+               (
+                   SELECT COUNT(*)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+                      AND pc.status IN ('PENDENTE', 'VENCIDO')
+               ) AS parcelas_abertas,
+               (
+                   SELECT COALESCE(SUM(pc.valor_centavos), 0)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+                      AND pc.status = 'PAGO'
+               ) AS valor_pago_centavos,
+               (
+                   SELECT COALESCE(SUM(pc.valor_centavos), 0)
+                     FROM parcelas_cartao pc
+                    WHERE pc.lancamento_cartao_id = lc.id
+                      AND pc.status IN ('PENDENTE', 'VENCIDO')
+               ) AS valor_aberto_centavos
+          FROM lancamentos_cartao lc
+         WHERE lc.cartao_credito_id = ?
+         ORDER BY lc.data_compra DESC, lc.id DESC
+        """,
+        (cartao_id,),
+    ).fetchall()
+
+    parcelas = db.execute(
+        """
+        SELECT pc.id, pc.numero_parcela, pc.valor_centavos, pc.vencimento,
+               pc.data_pagamento, pc.status,
+               lc.descricao AS lancamento_descricao, lc.quantidade_parcelas
+          FROM parcelas_cartao pc
+          JOIN lancamentos_cartao lc ON lc.id = pc.lancamento_cartao_id
+         WHERE lc.cartao_credito_id = ?
+         ORDER BY
+               CASE WHEN pc.status = 'VENCIDO' THEN 0 WHEN pc.status = 'PENDENTE' THEN 1 ELSE 2 END,
+               pc.vencimento,
+               pc.id
+        """,
+        (cartao_id,),
+    ).fetchall()
+
+    resumo = db.execute(
+        """
+        SELECT COALESCE(SUM(pc.valor_centavos), 0) AS total_centavos,
+               COALESCE(SUM(CASE WHEN pc.status = 'PAGO' THEN pc.valor_centavos ELSE 0 END), 0) AS pago_centavos,
+               COALESCE(SUM(CASE WHEN pc.status IN ('PENDENTE','VENCIDO') THEN pc.valor_centavos ELSE 0 END), 0) AS aberto_centavos,
+               COALESCE(SUM(CASE WHEN pc.status = 'VENCIDO' THEN pc.valor_centavos ELSE 0 END), 0) AS vencido_centavos
+          FROM parcelas_cartao pc
+          JOIN lancamentos_cartao lc ON lc.id = pc.lancamento_cartao_id
+         WHERE lc.cartao_credito_id = ?
+        """,
+        (cartao_id,),
+    ).fetchone()
+
+    return render_template(
+        'portal/cartao_detalhe.html',
+        cartao=cartao,
+        lancamentos=lancamentos,
+        parcelas=parcelas,
+        resumo=resumo,
+    )
 
 
 
@@ -1243,6 +1523,59 @@ def statement():
         elif mov['tipo'] == 'EMPRESTIMO':
             credito_recebido_periodo += valor
 
+    contratos_detalhe = db.execute(
+        """
+        SELECT e.id, e.descricao, e.data_emprestimo,
+               e.valor_original_centavos, e.saldo_atual_centavos,
+               e.status,
+               MAX(
+                   COALESCE((
+                        SELECT SUM(m.valor_centavos)
+                          FROM movimentacoes_emprestimo m
+                         WHERE m.emprestimo_id = e.id
+                           AND m.tipo IN ('ABATIMENTO', 'QUITACAO')
+                   ), 0),
+                   e.valor_original_centavos - e.saldo_atual_centavos
+               ) AS total_amortizado_centavos
+          FROM emprestimos e
+         WHERE e.cliente_id = ?
+         ORDER BY
+               CASE WHEN e.status = 'QUITADO' THEN 1 ELSE 0 END,
+               e.data_emprestimo,
+               e.id
+        """,
+        (cid,),
+    ).fetchall()
+
+    if contrato_id is not None:
+        contratos_exibir = [c for c in contratos_detalhe if c['id'] == contrato_id]
+    else:
+        contratos_exibir = contratos_detalhe
+
+    contratos_total_acordado = sum(c['valor_original_centavos'] for c in contratos_exibir)
+    contratos_total_amortizado = sum(c['total_amortizado_centavos'] for c in contratos_exibir)
+    contratos_total_saldo = sum(c['saldo_atual_centavos'] for c in contratos_exibir)
+
+    # Total histórico pago pelo cliente
+    historico_pago_sql = """
+        SELECT COALESCE(SUM(CASE WHEN m.tipo IN ('ABATIMENTO', 'QUITACAO') THEN m.valor_centavos ELSE 0 END), 0) AS total_amortizado_pago,
+               COALESCE(SUM(CASE WHEN m.tipo = 'JUROS' THEN m.valor_centavos ELSE 0 END), 0) AS total_taxas_pagas,
+               COALESCE(SUM(m.valor_centavos), 0) AS total_pago_historico
+          FROM movimentacoes_emprestimo m
+          JOIN emprestimos e ON e.id = m.emprestimo_id
+         WHERE e.cliente_id = ?
+           AND m.tipo IN ('JUROS', 'ABATIMENTO', 'QUITACAO')
+    """
+    historico_params = [cid]
+    if contrato_id is not None:
+        historico_pago_sql += " AND e.id = ?"
+        historico_params.append(contrato_id)
+
+    historico_row = db.execute(historico_pago_sql, historico_params).fetchone()
+    total_pago_historico = int(historico_row['total_pago_historico'] if historico_row else 0)
+    total_amortizado_pago_historico = int(historico_row['total_amortizado_pago'] if historico_row else 0)
+    total_taxas_pagas_historico = int(historico_row['total_taxas_pagas'] if historico_row else 0)
+
     resumo = {
         'total_pago_periodo_centavos': total_pago_periodo,
         'juros_pagos_periodo_centavos': juros_pagos_periodo,
@@ -1254,11 +1587,18 @@ def statement():
         'total_atrasado_centavos': total_atrasado,
         'quantidade_titulos': len(titulos),
         'quantidade_movimentos': len(movimentos),
+        'total_pago_historico_centavos': total_pago_historico,
+        'total_amortizado_pago_centavos': total_amortizado_pago_historico,
+        'total_taxas_pagas_centavos': total_taxas_pagas_historico,
+        'contratos_total_acordado_centavos': contratos_total_acordado,
+        'contratos_total_amortizado_centavos': contratos_total_amortizado,
+        'contratos_total_saldo_centavos': contratos_total_saldo,
     }
 
     return render_template(
         'portal/extrato.html',
         contratos=contratos,
+        contratos_detalhe=contratos_exibir,
         contrato_id=contrato_id,
         anos=anos,
         ano=ano or today.year,

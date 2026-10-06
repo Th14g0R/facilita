@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import table with context %}
+{% block title %}Cartão · {{ cartao.descricao }}{% endblock %}
+
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">ÁREA DO CLIENTE · CONSULTA</p>
+    <h1>{{ cartao.descricao }}</h1>
+  </div>
+  <div class="actions">
+    <a class="button" href="{{ url_for('portal.dashboard') }}">← Voltar para visão geral</a>
+  </div>
+</header>
+
+<section class="panel">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+    <div>
+      <h2 style="margin: 0;">Situação do Cartão</h2>
+      <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">
+        Vencimento todo dia <strong>{{ cartao.dia_vencimento or 'não definido' }}</strong> · 
+        Status: <span class="badge {{ 'ativo' if cartao.ativo else 'inativo' }}">{{ 'Ativo' if cartao.ativo else 'Inativo' }}</span>
+      </p>
+    </div>
+    <span class="badge" style="background: rgba(14, 165, 233, 0.1); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.25); font-size: 12px; padding: 4px 10px;">
+      Modo somente leitura
+    </span>
+  </div>
+
+  <div class="extrato-summary-grid" style="margin-top: 14px; margin-bottom: 6px;">
+    <div class="extrato-summary-card card-recebido">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Já Pago</span>
+        <strong class="extrato-summary-val valor-recebido money">{{ resumo.pago_centavos|money }}</strong>
+      </div>
+    </div>
+
+    <div class="extrato-summary-card card-aberto">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Em Aberto</span>
+        <strong class="extrato-summary-val money">{{ resumo.aberto_centavos|money }}</strong>
+      </div>
+    </div>
+
+    <div class="extrato-summary-card card-pago">
+      <div class="extrato-summary-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Vencido</span>
+        <strong class="extrato-summary-val valor-pago money">{{ resumo.vencido_centavos|money }}</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Compras / Lançamentos -->
+<section class="panel">
+  <h2>Compras Realizadas</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Data</th>
+          <th scope="col">Compra / Descrição</th>
+          <th scope="col">Parcelas</th>
+          <th scope="col" class="money" style="text-align: right;">Valor Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lc in lancamentos %}
+          <tr>
+            <td>{{ lc.data_compra|date_br }}</td>
+            <td style="font-weight: 500;">{{ lc.descricao }}</td>
+            <td>
+              <span class="badge {{ 'pago' if lc.parcelas_pagas == lc.quantidade_parcelas else 'ativo' }}">
+                {{ lc.parcelas_pagas }} de {{ lc.quantidade_parcelas }} pagas
+              </span>
+            </td>
+            <td class="money" style="text-align: right;">
+              <strong>{{ lc.valor_total_centavos|money }}</strong>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="4">
+              <div class="empty">Nenhuma compra registrada neste cartão.</div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Parcelas do Cartão -->
+<section class="panel">
+  <h2>Parcelas</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Parcela</th>
+          <th scope="col">Compra</th>
+          <th scope="col">Vencimento</th>
+          <th scope="col">Data Pagamento</th>
+          <th scope="col">Situação</th>
+          <th scope="col" class="money" style="text-align: right;">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in parcelas %}
+          <tr>
+            <td><strong>{{ p.numero_parcela }}ª</strong> de {{ p.quantidade_parcelas or '—' }}</td>
+            <td>{{ p.lancamento_descricao }}</td>
+            <td>{{ p.vencimento|date_br }}</td>
+            <td>{{ p.data_pagamento|date_br if p.data_pagamento else '—' }}</td>
+            <td>
+              {% if p.status == 'PAGO' %}
+                <span class="badge pago">Paga</span>
+              {% elif p.status == 'VENCIDO' %}
+                <span class="badge vencido">Atrasada</span>
+              {% else %}
+                <span class="badge previsto">Em aberto</span>
+              {% endif %}
+            </td>
+            <td class="money" style="text-align: right;">
+              <strong>{{ p.valor_centavos|money }}</strong>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="6">
+              <div class="empty">Nenhuma parcela registrada.</div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="margin-top: 14px; font-size: 12px;">
+    As alterações, pagamentos e inclusões de compras são efetuadas exclusivamente pela administração.
+  </p>
+</section>
+{% endblock %}

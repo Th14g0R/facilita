@@ -67,6 +67,7 @@
   </form>
 
   <!-- Resumo Visual de Fluxo Financeiro do Período -->
+  <!-- Resumo Visual de Fluxo Financeiro do Período e Valores Pagos -->
   <div class="extrato-summary-grid">
     <div class="extrato-summary-card card-recebido">
       <div class="extrato-summary-icon">
@@ -89,8 +90,26 @@
         </svg>
       </div>
       <div>
-        <span class="extrato-summary-label">Total Pago ao Facilita</span>
+        <span class="extrato-summary-label">Total Pago no Período</span>
         <strong class="extrato-summary-val valor-pago money">- {{ resumo.total_pago_periodo_centavos|money }}</strong>
+        <span class="muted" style="display: block; font-size: 11px; margin-top: 2px;">
+          Amortizado: {{ resumo.principal_pago_periodo_centavos|money }} · Taxas: {{ resumo.juros_pagos_periodo_centavos|money }}
+        </span>
+      </div>
+    </div>
+
+    <div class="extrato-summary-card" style="border-left: 4px solid #059669;">
+      <div class="extrato-summary-icon" style="background: rgba(5, 150, 105, 0.12); color: #059669;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <span class="extrato-summary-label">Total Histórico Pago</span>
+        <strong class="extrato-summary-val money" style="color: #059669;">{{ resumo.total_pago_historico_centavos|money }}</strong>
+        <span class="muted" style="display: block; font-size: 11px; margin-top: 2px;">
+          Amortizado: {{ resumo.total_amortizado_pago_centavos|money }} · Taxas: {{ resumo.total_taxas_pagas_centavos|money }}
+        </span>
       </div>
     </div>
 
@@ -106,6 +125,72 @@
         <strong class="extrato-summary-val money">{{ resumo.total_aberto_centavos|money }}</strong>
       </div>
     </div>
+  </div>
+
+  <!-- Detalhamento dos Contratos -->
+  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 28px; margin-bottom: 12px;">
+    <h2 style="margin: 0;">Detalhamento dos Contratos</h2>
+    <span class="muted" style="font-size: 13px;">Data da contratação, valores amortizados e saldo</span>
+  </div>
+
+  <div class="table-wrap" style="margin-bottom: 28px;">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Contrato</th>
+          <th scope="col">Data Contratação / Transferência</th>
+          <th scope="col" class="money" style="text-align: right;">Valor Acordado</th>
+          <th scope="col" class="money" style="text-align: right;">Total Amortizado Pago</th>
+          <th scope="col" class="money" style="text-align: right;">Saldo Restante</th>
+          <th scope="col" style="text-align: center;">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in contratos_detalhe %}
+          <tr>
+            <td style="font-weight: 500;">
+              #{{ c.id }}
+              {% if c.descricao %}
+                <span class="muted" style="font-size: 12px; margin-left: 4px;">({{ c.descricao }})</span>
+              {% endif %}
+            </td>
+            <td>
+              <span>{{ c.data_emprestimo|date_br }}</span>
+              <span class="muted" style="display: block; font-size: 11px;">Transferido ao cliente</span>
+            </td>
+            <td class="money" style="text-align: right;">{{ c.valor_original_centavos|money }}</td>
+            <td class="money" style="text-align: right;">
+              <span class="valor-pago" style="font-weight: 600;">{{ c.total_amortizado_centavos|money }}</span>
+            </td>
+            <td class="money" style="text-align: right;"><strong>{{ c.saldo_atual_centavos|money }}</strong></td>
+            <td style="text-align: center;">
+              {% if c.status == 'ATIVO' %}
+                <span class="badge ativo">Ativo</span>
+              {% else %}
+                <span class="badge pago">Quitado</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="6">
+              <div class="empty">Nenhum contrato encontrado para o filtro.</div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      {% if contratos_detalhe %}
+        <tfoot>
+          <tr style="font-weight: 600; border-top: 2px solid var(--line);">
+            <td colspan="2" style="text-align: right;"><strong>Somatório dos Contratos:</strong></td>
+            <td class="money" style="text-align: right;"><strong>{{ resumo.contratos_total_acordado_centavos|money }}</strong></td>
+            <td class="money" style="text-align: right;"><strong class="valor-pago">{{ resumo.contratos_total_amortizado_centavos|money }}</strong></td>
+            <td class="money" style="text-align: right;"><strong>{{ resumo.contratos_total_saldo_centavos|money }}</strong></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      {% endif %}
+    </table>
   </div>
 
   <!-- Seção de Títulos -->

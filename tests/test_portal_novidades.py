@@ -222,5 +222,125 @@ class TestPortalNovidades(unittest.TestCase):
         self.assertFalse(data['tem_arquivo'])
 
 
+    def test_portal_dashboard_contratos_metricas_e_cartoes(self):
+        """Testa somatórios de contratos, próximos pagamentos do mês e exibição de cartões no portal."""
+        self.authenticate_portal(1)
+        with self.app.app_context():
+            db = application.get_db()
+            # Criar 2 contratos: 1 ativo com amortização parcial e 1 quitado
+            db.execute("""
+                INSERT INTO emprestimos (
+                    id, cliente_id, descricao, data_emprestimo,
+                    valor_original_centavos, saldo_atual_centavos, taxa_juros_mensal,
+                    data_primeiro_vencimento, dia_vencimento, status
+                ) VALUES
+                (1, 1, 'Contrato Ativo', '2026-05-10', 100000, 70000, 10.0, '2026-06-10', 10, 'ATIVO'),
+                (2, 1, 'Contrato Quitado', '2026-01-15', 50000, 0, 10.0, '2026-02-15', 15, 'QUITADO')
+            """)
+            # Registrar amortização no contrato 1 e quitação no contrato 2
+            db.execute("""
+                INSERT INTO movimentacoes_emprestimo (
+                    id, emprestimo_id, tipo, data_movimento, valor_centavos,
+                    saldo_antes_centavos, saldo_depois_centavos
+                ) VALUES
+                (1, 1, 'ABATIMENTO', '2026-07-10', 30000, 100000, 70000),
+                (2, 2, 'QUITACAO', '2026-04-15', 50000, 50000, 0)
+            """)
+            # Criar cartão de crédito e compras com parcelas
+            db.execute("""
+                INSERT INTO cartoes_credito (id, cliente_id, descricao, dia_vencimento, ativo)
+                VALUES (1, 1, 'Nubank Cliente', 15, 1)
+            """)
+            db.execute("""
+                INSERT INTO lancamentos_cartao (id, cartao_credito_id, descricao, valor_total_centavos, quantidade_parcelas, data_compra, usuario_id)
+                VALUES (1, 1, 'Notebook Dell', 60000, 2, '2026-09-01', 1)
+            """)
+            db.execute("""
+                INSERT INTO parcelas_cartao (id, lancamento_cartao_id, numero_parcela, valor_centavos, vencimento, data_pagamento, status)
+                VALUES
+                (1, 1, 1, 30000, '2026-09-15', '2026-09-15', 'PAGO'),
+                (2, 1, 2, 30000, '2026-10-15', NULL, 'PENDENTE')
+            """)
+            db.commit()
+
+        resp = self.client.get('/portal')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+
+        # Checar somatórios de contratos
+        self.assertIn("Resumo dos Meus Contratos", html)
+        self.assertIn("Total dos Contratos (2)", html)
+        self.assertIn("Total Amortizado", html)
+        self.assertIn("Quitados / Inativos (1)", html)
+        self.assertIn("Valor Líquido dos Contratos", html)
+
+        # Checar tabela de contratos com data e amortizado
+        self.assertIn("Transferido ao cliente", html)
+        self.assertIn("Contrato Ativo", html)
+        self.assertIn("Contrato Quitado", html)
+
+        # Checar cartões com dados não zerados e compras
+        self.assertIn("Nubank Cliente", html)
+        self.assertIn("Notebook Dell", html)
+        self.assertIn("Somente leitura", html)
+
+    def test_portal_card_detail_endpoint(self):
+        """Testa página individual de detalhe do cartão em modo somente leitura."""
+        self.authenticate_portal(1)
+        with self.app.app_context():
+            db = application.get_db()
+            db.execute("""
+                INSERT INTO cartoes_credito (id, cliente_id, descricao, dia_vencimento, ativo)
+                VALUES (2, 1, 'Visa Gold', 10, 1)
+            """)
+            db.execute("""
+                INSERT INTO lancamentos_cartao (id, cartao_credito_id, descricao, valor_total_centavos, quantidade_parcelas, data_compra, usuario_id)
+                VALUES (2, 2, 'Smartphone', 40000, 2, '2026-08-01', 1)
+            """)
+            db.execute("""
+                INSERT INTO parcelas_cartao (id, lancamento_cartao_id, numero_parcela, valor_centavos, vencimento, status)
+                VALUES
+                (3, 2, 1, 20000, '2026-08-10', 'PAGO'),
+                (4, 2, 2, 20000, '2026-09-10', 'PENDENTE')
+            """)
+            db.commit()
+
+        resp = self.client.get('/portal/cartoes/2')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn("Visa Gold", html)
+        self.assertIn("Smartphone", html)
+        self.assertIn("Modo somente leitura", html)
+
+    def test_portal_extrato_com_detalhamento_contratos(self):
+        """Testa que o extrato exibe o detalhamento de contratos e somatório de valores pagos."""
+        self.authenticate_portal(1)
+        with self.app.app_context():
+            db = application.get_db()
+            db.execute("""
+                INSERT INTO emprestimos (
+                    id, cliente_id, descricao, data_emprestimo,
+                    valor_original_centavos, saldo_atual_centavos, taxa_juros_mensal,
+                    data_primeiro_vencimento, dia_vencimento, status
+                ) VALUES (3, 1, 'Operação Veículo', '2026-03-01', 200000, 150000, 5.0, '2026-04-01', 1, 'ATIVO')
+            """)
+            db.execute("""
+                INSERT INTO movimentacoes_emprestimo (
+                    id, emprestimo_id, tipo, data_movimento, valor_centavos,
+                    saldo_antes_centavos, saldo_depois_centavos
+                ) VALUES (3, 3, 'ABATIMENTO', '2026-04-01', 50000, 200000, 150000)
+            """)
+            db.commit()
+
+        resp = self.client.get('/portal/extrato')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn("Detalhamento dos Contratos", html)
+        self.assertIn("Operação Veículo", html)
+        self.assertIn("Total Amortizado Pago", html)
+        self.assertIn("Total Histórico Pago", html)
+
+
 if __name__ == '__main__':
     unittest.main()
+
