@@ -11,12 +11,41 @@
 </div>
 </header>
 <section class="panel">
-<p>{{ cliente.cpf }} · {{ cliente.telefone or 'Telefone não informado' }} · {{ cliente.email or 'E-mail não informado' }}</p>
-<div class="actions">
-<a href="{{ url_for('clientes_editar',cliente_id=cliente.id) }}">Editar cadastro</a>
-<a href="{{ url_for('contas_nova',cliente_id=cliente.id) }}">Adicionar conta</a>
-<a href="{{ url_for('relatorio_cliente',cliente_id=cliente.id) }}">Extrato completo</a>
-<a href="{{ url_for('titulos_receber_relatorio',cliente_id=cliente.id) }}">Cobrar cliente</a>
+<div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+  <div class="profile-avatar-large-container">
+    {% if cliente.foto_perfil %}
+      <img id="avatarPreviewCliente" src="{{ cliente.foto_perfil }}" alt="Foto de {{ cliente.nome }}" class="profile-avatar-large-img">
+    {% else %}
+      <div id="avatarFallbackCliente" class="profile-avatar-large-fallback">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </div>
+    {% endif %}
+  </div>
+  <div style="flex:1; min-width:240px;">
+    <p style="margin:0 0 6px 0; font-size:1.05rem;"><strong>{{ cliente.cpf }}</strong> · {{ cliente.telefone or 'Telefone não informado' }} · {{ cliente.email or 'E-mail não informado' }}</p>
+    <div class="actions" style="margin-top:8px;">
+      <a href="{{ url_for('clientes_editar',cliente_id=cliente.id) }}">Editar cadastro</a>
+      <a href="{{ url_for('contas_nova',cliente_id=cliente.id) }}">Adicionar conta</a>
+      <a href="{{ url_for('relatorio_cliente',cliente_id=cliente.id) }}">Extrato completo</a>
+      <a href="{{ url_for('titulos_receber_relatorio',cliente_id=cliente.id) }}">Cobrar cliente</a>
+    </div>
+  </div>
+  <div>
+    <form method="post" action="{{ url_for('clientes_foto', cliente_id=cliente.id) }}" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:8px;">
+      {{ csrf() }}
+      <label class="button" style="cursor:pointer; margin:0; font-size:0.85rem; padding:6px 12px; display:inline-flex; align-items:center; gap:6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        <span>{{ 'Trocar foto' if cliente.foto_perfil else 'Adicionar foto' }}</span>
+        <input type="file" name="foto" accept="image/png, image/jpeg, image/jpg, image/webp" style="display:none;" onchange="this.form.submit()">
+      </label>
+      {% if cliente.foto_perfil %}
+        <button type="submit" name="action" value="remover_foto" class="button danger" style="margin:0; font-size:0.85rem; padding:6px 12px;" onclick="return confirm('Deseja remover a foto deste cliente?')">Remover foto</button>
+      {% endif %}
+    </form>
+  </div>
 </div>
 </section>
 <section class="panel">

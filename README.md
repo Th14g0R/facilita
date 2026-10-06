@@ -1,93 +1,31 @@
-# Facilita — versão 2
+# Facilita — Sistema de Gestão Financeira
 
-Versão **2.4.6**, mantida na branch **main**.
-Sistema de uso real para empréstimos pessoais, recebimentos e cartão de crédito,
-com interface administrativa e portal do cliente. Não inclui dados demonstrativos
-nem usuário ou senha padrão.
+Versão **2.5.0**, mantida na branch **main**.
+Sistema de uso em produção para gestão financeira discreta, contratos/operações, recebimentos e cartões de crédito, com interface administrativa completa e portal de autoatendimento para o cliente. Não inclui dados demonstrativos nem usuário ou senha padrão.
 
 ## Funcionalidades
 
-- Clientes, contratos independentes, contas bancárias e snapshots históricos.
-- Juros mensais, abatimentos e quitação com valores em centavos inteiros.
-- Atraso proporcional: juro mensal original × dias de atraso ÷ 30.
-- Reagendamento e recebimentos agrupados com prévia detalhada, sem capitalizar
-  atraso nos títulos futuros.
-- Cartões, dashboard, relatórios, comprovantes privados e auditoria.
-- CSRF, senhas com hash, limites de tentativas e transações financeiras atômicas.
+- **Contratos e Operações**: Aportes, juros mensais, amortizações e liquidações com valores estritamente em centavos inteiros (`BIGINT`).
+- **Atraso Proporcional**: Juro mensal original × dias de atraso ÷ 30, sem capitalização indevida de juros em títulos futuros.
+- **Recebimentos e Reagendamento**: Agrupamento flexível de cobranças com prévia de cálculos e opções de liquidação.
+- **Portal do Cliente**: Acesso seguro para visualização de extratos, comprovantes e dados cadastrais, com solicitação de acesso e foto de perfil.
+- **Login Unificado**: Seletor intuitivo entre Área do Cliente e Acesso Administrativo com recuperação de acesso.
+- **Modo Privacidade**: Ocultação rápida de valores monetários na tela para uso discreto em locais públicos.
+- **Auditoria e Segurança**: Registro completo de operações sensíveis com confirmação de senha, senhas em hash Scrypt, CSRF e cookies seguros.
 
-## Instalação: escolha seu sistema
+## Arquitetura na Nuvem (Produção)
 
-| Sistema | Guia completo | Como executar |
-| --- | --- | --- |
-| Windows | [Instalar no Windows](docs/DEPLOYMENT_WINDOWS.md) | Gerenciador `.bat` ou Waitress manual; serviço Windows |
-| macOS | [Produção no Mac e gerenciador](docs/PRODUCAO_MACOS.md) | Menu `.command`: instalar, importar v1, backup e atualizar |
-| Linux | [Instalar no Linux](docs/DEPLOYMENT_LINUX.md) | Terminal; serviço systemd opcional |
+O **Facilita** opera 100% diretamente na nuvem (sem necessidade de instalação local):
 
-O [guia geral](docs/INSTALACAO.md) explica dados, backup, atualização, restauração
-e acesso pela rede. Todos os sistemas usam o mesmo código com Waitress e SQLite.
-O gerenciador `.bat` é exclusivo do Windows.
+- **Hospedagem Web Serverless**: [Vercel](https://vercel.com) com CDN global, rewrites serverless (`api/index.py`) e SSL/HTTPS automático.
+- **Banco de Dados Produção**: [Supabase](https://supabase.com) (PostgreSQL 17 gerenciado no datacenter de São Paulo - `sa-east-1`).
+- **Acesso Mobile (PWA)**: Pode ser adicionado como aplicativo à tela inicial de celulares (iOS Safari ou Android Chrome).
 
-### Instalação guiada no Mac
+Para detalhes de variáveis de ambiente, domínios e backups, consulte o [Guia da Nuvem Vercel + Supabase](docs/NUVEM_VERCEL_SUPABASE.md).
 
-Baixe **Code → Download ZIP** da branch `release/v2`, extraia e execute
-`bash Gerenciar-Emprestimo.command` no Terminal dessa pasta. O menu prepara a
-instalação fora do VS Code, em diretório próprio, e pede confirmação antes de
-ativar ou importar a base v1. O endereço padrão é **http://127.0.0.1:5000**.
-Veja o [passo a passo completo](docs/PRODUCAO_MACOS.md).
+## Desenvolvimento e Testes
 
-### Alternativa manual no macOS/Linux
-
-Com Git e Python 3.10+ instalados, em uma pasta onde deseja guardar o sistema:
-
-```sh
-git clone --branch release/v2 --single-branch https://github.com/Th14g0R/emprestimo.git emprestimo-v2
-cd emprestimo-v2
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.lock
-.venv/bin/waitress-serve --listen=127.0.0.1:5000 --threads=4 wsgi:application
-```
-
-No Mac, se o Python instalado responde por `python3.14`, use esse comando no
-lugar de `python3`. Abra **http://127.0.0.1:5000** no mesmo computador e crie o
-administrador. Mantenha o Terminal aberto; Control + C para parar. Para executar
-sem Terminal, siga a configuração automática do guia do seu sistema.
-
-### Início no Windows
-
-Baixe a branch `release/v2` e execute **Gerenciar-Emprestimo.bat**. Ele instala o
-serviço **Emprestimo** e acompanha essa branch. Para atualizar uma instalação
-anterior, use o gerenciador desta versão. O [guia Windows](docs/DEPLOYMENT_WINDOWS.md)
-também explica a instalação manual e os pré-requisitos.
-
-## Dados e atualização
-
-O padrão é `data/emprestimos.db`; comprovantes ficam em `data/comprovantes` e a
-chave da sessão em `data/.secret_key`. Migrações são incrementais. Banco, chave,
-comprovantes, backups e ambientes Python não fazem parte da publicação.
-
-Antes de restaurar um banco antigo, valide uma cópia:
-
-Windows:
-
-```bat
-.venv\Scripts\python.exe scripts\verificar_banco.py C:\backup\emprestimos.db
-```
-
-macOS/Linux:
-
-```sh
-.venv/bin/python scripts/verificar_banco.py /caminho/do/backup/emprestimos.db
-```
-
-Veja [compatibilidade e juros de atraso](docs/JUROS_ATRASO_E_RESTAURACAO.md).
-O arquivo `.env.example` documenta variáveis de ambiente; a aplicação não carrega
-arquivos `.env` automaticamente.
-
-## Desenvolvimento e validação
-
-Stack: Python 3.10+, Flask, SQLite, Jinja2, HTML/CSS, Pillow e Waitress.
-`requirements.txt` define intervalos compatíveis; `requirements.lock` fixa as
-versões validadas neste build.
+Stack: Python 3.12+, Flask, PostgreSQL/SQLite, Jinja2, HTML5/CSS3 moderno.
 
 ```sh
 python -m pip install -r requirements.lock
@@ -95,10 +33,12 @@ python -m unittest discover -s tests -v
 python teste_local.py
 ```
 
-O servidor isolado usa `data/local-test` e porta 5001, sem inserir exemplos.
-Para desenvolvimento no banco configurado normalmente, use `python app.py`.
+O servidor local de testes roda isoladamente na porta 5001 com banco em `data/local-test`.
+
+## Documentação
 
 - [Changelog](CHANGELOG.md)
+- [Nuvem Vercel + Supabase](docs/NUVEM_VERCEL_SUPABASE.md)
 - [Arquitetura](docs/ARCHITECTURE.md)
 - [Regras financeiras](docs/BUSINESS_RULES.md)
 - [Espaço e manutenção](docs/RECURSOS_E_MANUTENCAO.md)

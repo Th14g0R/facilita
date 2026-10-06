@@ -8,8 +8,40 @@
 </div>
 </header>
 <section class="panel">
-<h2>{{ acesso.cliente_nome }}</h2>
-<form method="post">{{ csrf() }}<div class="form-grid">{{ field('usuario','Nome de usuário (login)',form.usuario) }}{{ field('email','E-mail',form.email,type='email',required=true) }}{{ field('telefone','Telefone',form.telefone) }}{{ select('status','Situação',[{'id':'ATIVO','nome':'Ativo'},{'id':'PENDENTE','nome':'Pendente'},{'id':'BLOQUEADO','nome':'Inativo'},{'id':'REJEITADO','nome':'Rejeitado'}],form.status) }}</div>{{ field('nova_senha','Nova senha (opcional, mínimo 8 caracteres)',type='password') }}{{ field('confirmar_nova_senha','Confirmar nova senha',type='password') }}{{ field('observacao_admin','Observação',form.observacao_admin,type='textarea') }}{{ field('senha_confirmacao','Sua senha de administrador',type='password',required=true) }}<button class="button primary">Salvar acesso</button>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--line);">
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div class="profile-avatar-large-container">
+      {% if acesso.foto_perfil %}
+        <img src="{{ acesso.foto_perfil }}" alt="Foto de {{ acesso.cliente_nome }}" class="profile-avatar-large-img">
+      {% else %}
+        <div class="profile-avatar-large-fallback">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
+      {% endif %}
+    </div>
+    <div>
+      <h2 style="margin:0 0 4px 0;">{{ acesso.cliente_nome }}</h2>
+      <p class="muted" style="margin:0; font-size:0.875rem;">Gerenciamento de credencial e foto cadastrada pelo cliente.</p>
+    </div>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <form method="post" action="{{ url_for('portal.edit_access', aid=acesso.id) }}" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center;">
+      {{ csrf() }}
+      <label class="button" style="cursor:pointer; margin:0; font-size:0.85rem; padding:6px 12px; display:inline-flex; align-items:center; gap:6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        <span>{{ 'Trocar foto' if acesso.foto_perfil else 'Adicionar foto' }}</span>
+        <input type="file" name="foto" accept="image/png, image/jpeg, image/jpg, image/webp" style="display:none;" onchange="this.form.submit()">
+      </label>
+      {% if acesso.foto_perfil %}
+        <button type="submit" name="action_foto" value="remover_foto" class="button danger" style="margin:0; font-size:0.85rem; padding:6px 12px;" onclick="return confirm('Deseja remover a foto deste cliente?')">Remover foto</button>
+      {% endif %}
+    </form>
+  </div>
+</div>
+<form method="post" enctype="multipart/form-data">{{ csrf() }}<div class="form-grid">{{ field('usuario','Nome de usuário (login)',form.usuario) }}{{ field('email','E-mail',form.email,type='email',required=true) }}{{ field('telefone','Telefone',form.telefone) }}{{ select('status','Situação',[{'id':'ATIVO','nome':'Ativo'},{'id':'PENDENTE','nome':'Pendente'},{'id':'BLOQUEADO','nome':'Inativo'},{'id':'REJEITADO','nome':'Rejeitado'}],form.status) }}</div>{{ field('nova_senha','Nova senha (opcional, mínimo 8 caracteres)',type='password') }}{{ field('confirmar_nova_senha','Confirmar nova senha',type='password') }}{{ field('observacao_admin','Observação',form.observacao_admin,type='textarea') }}{{ field('senha_confirmacao','Sua senha de administrador',type='password',required=true) }}<button class="button primary">Salvar acesso</button>
 </form>
 
 {% if request.args.get('reset_link') %}

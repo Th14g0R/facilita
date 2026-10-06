@@ -11,4 +11,42 @@
 <section class="panel">
 <form method="get" class="filters">{{ field("q","Pesquisar",request.args.get("q","")) }}<button class="button">Filtrar</button>
 <a href="{{ request.path }}">Limpar</a>
-</form>{{ table(acessos,[('cliente_nome', 'Cliente'), ('usuario', 'Usuário'), ('email', 'E-mail'), ('status', 'Situação')],'portal.edit_access','aid') }}</section>{% endblock %}
+</form>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+  <th scope="col">Cliente</th>
+  <th scope="col">Usuário</th>
+  <th scope="col">E-mail</th>
+  <th scope="col">Situação</th>
+  <th scope="col">Ação</th>
+</tr>
+</thead>
+<tbody>
+{% for row in acessos %}
+<tr>
+  <td>
+    <div class="client-cell-with-avatar">
+      {% if row.foto_perfil %}
+        <img src="{{ row.foto_perfil }}" alt="Foto de {{ row.cliente_nome }}" class="client-avatar-thumb">
+      {% else %}
+        <span class="client-avatar-thumb-fallback">{{ (row.cliente_nome[:1]|upper) if row.cliente_nome else 'C' }}</span>
+      {% endif %}
+      <strong>{{ row.cliente_nome }}</strong>
+    </div>
+  </td>
+  <td>{{ row.usuario or '—' }}</td>
+  <td>{{ row.email }}</td>
+  <td><span class="badge {{ row.status|lower }}">{{ row.status|acesso_status }}</span></td>
+  <td><a href="{{ url_for('portal.edit_access', aid=row.id) }}">Abrir <span class="sr-only">acesso de {{ row.cliente_nome }}</span>→</a></td>
+</tr>
+{% else %}
+<tr>
+  <td colspan="5"><div class="empty">Nenhum acesso cadastrado.</div></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</section>{% endblock %}

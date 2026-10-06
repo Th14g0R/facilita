@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     tentativas_falhas INTEGER NOT NULL DEFAULT 0,
-    bloqueado_ate TEXT
+    bloqueado_ate TEXT,
+    foto_perfil TEXT
 );
 
 CREATE TABLE IF NOT EXISTS clientes (
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     estado TEXT,
     cep TEXT,
     observacoes TEXT,
+    foto_perfil TEXT,
     ativo INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0, 1)),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -304,4 +306,8 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_created_at ON auditoria(created_at);
 CREATE INDEX IF NOT EXISTS idx_comprovantes_cliente ON comprovantes_pagamento(cliente_id);
 CREATE INDEX IF NOT EXISTS idx_comprovantes_status ON comprovantes_pagamento(status);
 CREATE INDEX IF NOT EXISTS idx_comprovantes_itens_titulo ON comprovantes_pagamento_itens(titulo_receber_id);
+
+-- Migrações idempotentes de colunas
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS foto_perfil TEXT;
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS foto_perfil TEXT;
 

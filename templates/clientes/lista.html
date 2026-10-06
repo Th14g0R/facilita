@@ -18,7 +18,48 @@
 </select>
 </label>
 <button class="button">Filtrar</button>
-<a href="{{ request.path }}">Limpar</a>
-</form>{{ table(clientes,[('nome', 'Cliente'), ('cpf', 'CPF'), ('telefone', 'Telefone'), ('portal_usuario_formatado', 'Usuário Portal'), ('portal_acesso_formatado', 'Acesso recente')],'clientes_detalhe','cliente_id') }}</section>
+</form>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+  <th scope="col">Cliente</th>
+  <th scope="col">CPF</th>
+  <th scope="col">Telefone</th>
+  <th scope="col">Usuário Portal</th>
+  <th scope="col">Acesso recente</th>
+  <th scope="col">Ação</th>
+</tr>
+</thead>
+<tbody>
+{% for row in clientes %}
+<tr>
+  <td>
+    <div class="client-cell-with-avatar">
+      {% if row.foto_perfil %}
+        <img src="{{ row.foto_perfil }}" alt="Foto de {{ row.nome }}" class="client-avatar-thumb">
+      {% else %}
+        <span class="client-avatar-thumb-fallback">{{ (row.nome[:1]|upper) if row.nome else 'C' }}</span>
+      {% endif %}
+      <strong>{{ row.nome }}</strong>
+    </div>
+  </td>
+  <td>{{ row.cpf or '—' }}</td>
+  <td>{{ row.telefone or '—' }}</td>
+  <td>{{ row.portal_usuario_formatado }}</td>
+  <td>{{ row.portal_acesso_formatado }}</td>
+  <td>
+    <a href="{{ url_for('clientes_detalhe', cliente_id=row.id) }}">Abrir <span class="sr-only">cliente {{ row.nome }}</span>→</a>
+  </td>
+</tr>
+{% else %}
+<tr>
+  <td colspan="6"><div class="empty">Nenhum cliente encontrado.</div></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</section>
 <nav class="pagination" aria-label="Paginação">
 <span>{{ total }} clientes · Página {{ pagina }}</span>{% if pagina>1 %}<a href="{{ url_for('clientes_lista',q=termo,status=status,pagina=pagina-1) }}">← Anterior</a>{% endif %}{% if pagina*50<total %}<a href="{{ url_for('clientes_lista',q=termo,status=status,pagina=pagina+1) }}">Próxima →</a>{% endif %}</nav>{% endblock %}

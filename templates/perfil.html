@@ -9,7 +9,61 @@
   </div>
 </header>
 
-<div class="panel" style="max-width: 580px;">
+<div style="display: flex; flex-direction: column; gap: 24px; max-width: 580px;">
+
+  <!-- Card: Foto de Perfil do Administrador -->
+  <div class="panel">
+    <h2>Foto do Perfil</h2>
+    <p class="muted" style="margin-bottom: 20px;">Sua foto será exibida na barra lateral e ao lado do seu nome de usuário.</p>
+
+    <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+      <div class="profile-avatar-large-container">
+        {% if usuario.foto_perfil %}
+          <img id="avatarPreviewAdmin" src="{{ usuario.foto_perfil }}" alt="Foto do perfil de {{ usuario.nome }}" class="profile-avatar-large-img">
+        {% else %}
+          <div id="avatarFallbackAdmin" class="profile-avatar-large-fallback">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <img id="avatarPreviewAdmin" src="" alt="Prévia da foto" class="profile-avatar-large-img" style="display: none;">
+        {% endif %}
+      </div>
+
+      <div style="flex: 1; min-width: 240px;">
+        <form method="post" action="{{ url_for('perfil') }}" enctype="multipart/form-data">
+          {{ csrf() }}
+          <input type="hidden" name="action_foto" value="salvar_foto">
+
+          <label class="field" style="margin-bottom: 10px;">
+            <span style="font-weight: 600;">Selecione uma imagem</span>
+            <input type="file" id="inputFotoAdmin" name="foto" accept="image/png, image/jpeg, image/jpg, image/webp" required>
+          </label>
+
+          <p class="muted" style="font-size: 12px; margin: 0 0 12px; line-height: 1.4;">
+            <strong>Limite:</strong> Máximo de 1024 KB (1 MB). Recorte quadrado automático em alta definição.
+          </p>
+
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button type="submit" class="button primary" style="font-size: 13px;">Salvar foto</button>
+            {% if usuario.foto_perfil %}
+              <button type="button" class="button danger" id="btnRemoverFotoAdmin" style="font-size: 13px;">Remover foto</button>
+            {% endif %}
+          </div>
+        </form>
+
+        {% if usuario.foto_perfil %}
+          <form id="formRemoverFotoAdmin" method="post" action="{{ url_for('perfil') }}" style="display: none;">
+            {{ csrf() }}
+            <input type="hidden" name="action_foto" value="remover_foto">
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
   <h2>Dados do Usuário</h2>
   <p class="muted" style="margin-bottom: 20px;">Atualize suas informações de identificação ou altere sua senha de acesso.</p>
 
@@ -55,4 +109,43 @@
     </div>
   </form>
 </div>
+</div>
+
+<script>
+  (function() {
+    const inputFoto = document.getElementById('inputFotoAdmin');
+    const avatarPreview = document.getElementById('avatarPreviewAdmin');
+    const avatarFallback = document.getElementById('avatarFallbackAdmin');
+    const btnRemover = document.getElementById('btnRemoverFotoAdmin');
+    const formRemover = document.getElementById('formRemoverFotoAdmin');
+
+    if (inputFoto && avatarPreview) {
+      inputFoto.addEventListener('change', function(e) {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          if (file.size > 1024 * 1024) {
+            alert('O arquivo selecionado é maior que 1024 KB (1 MB). Escolha uma imagem menor.');
+            inputFoto.value = '';
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = function(evt) {
+            avatarPreview.src = evt.target.result;
+            avatarPreview.style.display = 'block';
+            if (avatarFallback) avatarFallback.style.display = 'none';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    if (btnRemover && formRemover) {
+      btnRemover.addEventListener('click', function() {
+        if (confirm('Tem certeza de que deseja remover sua foto de perfil?')) {
+          formRemover.submit();
+        }
+      });
+    }
+  })();
+</script>
 {% endblock %}

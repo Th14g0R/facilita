@@ -315,10 +315,16 @@ def register_hooks(app: Flask) -> None:
         g.usuario = None
 
         if user_id is not None:
-            g.usuario = get_db().execute(
-                "SELECT id, nome, login, ativo FROM usuarios WHERE id = ?",
-                (user_id,),
-            ).fetchone()
+            try:
+                g.usuario = get_db().execute(
+                    "SELECT id, nome, login, ativo, foto_perfil FROM usuarios WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
+            except Exception:
+                g.usuario = get_db().execute(
+                    "SELECT id, nome, login, ativo FROM usuarios WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
 
             if g.usuario is None or not g.usuario["ativo"]:
                 session.clear()
@@ -2001,7 +2007,7 @@ def register_routes(app: Flask) -> None:
                     f"Acesso temporariamente bloqueado por excesso de tentativas. Aguarde {tempo_desc} antes de tentar novamente.",
                     "danger",
                 )
-                return render_template("login.html", login=login_usuario), 401
+                return render_template("login.html", login=login_usuario, tipo_login="admin"), 401
 
             senha_correta = bool(
                 usuario is not None
@@ -2035,10 +2041,10 @@ def register_routes(app: Flask) -> None:
                             "Limite de 5 tentativas incorretas atingido. Seu acesso foi temporariamente bloqueado por 15 minutos. Aguarde 15 minutos antes de tentar novamente.",
                             "danger",
                         )
-                        return render_template("login.html", login=login_usuario), 401
+                        return render_template("login.html", login=login_usuario, tipo_login="admin"), 401
 
                 flash("Login ou senha inválidos.", "danger")
-                return render_template("login.html", login=login_usuario), 401
+                return render_template("login.html", login=login_usuario, tipo_login="admin"), 401
 
             db.execute(
                 """
@@ -2061,7 +2067,8 @@ def register_routes(app: Flask) -> None:
 
             return redirect(url_for("dashboard"))
 
-        return render_template("login.html")
+        tipo_login = request.args.get("tipo", "cliente")
+        return render_template("login.html", tipo_login=tipo_login, login=request.args.get("login", ""))
 
     @app.route("/logout", methods=["GET", "POST"])
     def logout():
@@ -2085,6 +2092,39 @@ def register_routes(app: Flask) -> None:
         }
 
         if request.method == "POST":
+            action_foto = request.form.get("action_foto", "").strip()
+            if action_foto == "remover_foto":
+                db.execute(
+                    "UPDATE usuarios SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (usuario["id"],),
+                )
+                registrar_auditoria(db, "usuario", usuario["id"], "FOTO_REMOVIDA", "Foto de perfil do administrador removida.")
+                db.commit()
+                flash("Foto de perfil removida com sucesso.", "success")
+                return redirect(url_for("perfil"))
+
+            if action_foto == "salvar_foto" or ("foto" in request.files and request.files["foto"].filename and not request.form.get("senha_atual")):
+                foto_file = request.files.get("foto")
+                if foto_file and foto_file.filename:
+                    from image_utils import processar_foto_perfil, MAX_PROFILE_PHOTO_BYTES
+                    raw = foto_file.read(MAX_PROFILE_PHOTO_BYTES + 1024)
+                    if len(raw) > MAX_PROFILE_PHOTO_BYTES:
+                        flash("O arquivo da foto não pode ultrapassar 1024 KB (1 MB). Escolha uma imagem menor.", "warning")
+                        return redirect(url_for("perfil"))
+                    try:
+                        b64_foto = processar_foto_perfil(raw)
+                        db.execute(
+                            "UPDATE usuarios SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (b64_foto, usuario["id"]),
+                        )
+                        registrar_auditoria(db, "usuario", usuario["id"], "FOTO_ATUALIZADA", "Foto de perfil do administrador atualizada.")
+                        db.commit()
+                        flash("Foto de perfil atualizada com sucesso!", "success")
+                        return redirect(url_for("perfil"))
+                    except Exception as ex:
+                        flash(f"Não foi possível salvar a foto: {ex}", "danger")
+                        return redirect(url_for("perfil"))
+
             nome = request.form.get("nome", "").strip()
             senha_atual = request.form.get("senha_atual", "")
             nova_senha = request.form.get("nova_senha", "")
@@ -2396,6 +2436,7 @@ def register_routes(app: Flask) -> None:
         # Consulta defensiva com fallback caso a coluna usuario ainda não exista
         select_cols = """
             SELECT c.id, c.nome, c.telefone, c.email, c.cpf, c.cidade, c.estado, c.ativo, c.created_at,
+                   COALESCE(c.foto_perfil, ca.foto_perfil) AS foto_perfil,
                    ca.id AS portal_id,
                    ca.usuario AS portal_usuario,
                    ca.status AS portal_status,
@@ -2409,6 +2450,7 @@ def register_routes(app: Flask) -> None:
                 db.rollback()
             fallback_cols = """
                 SELECT c.id, c.nome, c.telefone, c.email, c.cpf, c.cidade, c.estado, c.ativo, c.created_at,
+                       COALESCE(ca.foto_perfil, NULL) AS foto_perfil,
                        ca.id AS portal_id,
                        NULL AS portal_usuario,
                        ca.status AS portal_status,
@@ -2618,12 +2660,67 @@ def register_routes(app: Flask) -> None:
                     cliente_id,
                 ),
             )
+
+            if request.form.get("remover_foto") == "1":
+                db.execute("UPDATE clientes SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (cliente_id,))
+                db.execute("UPDATE clientes_acessos SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE cliente_id = ?", (cliente_id,))
+                registrar_auditoria(db, "cliente", cliente_id, "FOTO_REMOVIDA", f"Foto do cliente {form['nome']} removida pelo administrador.")
+            elif "foto" in request.files and request.files["foto"].filename:
+                foto_file = request.files.get("foto")
+                if foto_file and foto_file.filename:
+                    from image_utils import processar_foto_perfil, MAX_PROFILE_PHOTO_BYTES
+                    raw = foto_file.read(MAX_PROFILE_PHOTO_BYTES + 1024)
+                    if len(raw) <= MAX_PROFILE_PHOTO_BYTES:
+                        try:
+                            b64 = processar_foto_perfil(raw)
+                            db.execute("UPDATE clientes SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (b64, cliente_id))
+                            db.execute("UPDATE clientes_acessos SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE cliente_id = ?", (b64, cliente_id))
+                            registrar_auditoria(db, "cliente", cliente_id, "FOTO_ATUALIZADA", f"Foto do cliente {form['nome']} atualizada pelo administrador.")
+                        except Exception:
+                            pass
+
             db.commit()
 
             flash("Cliente atualizado com sucesso.", "success")
             return redirect(url_for("clientes_detalhe", cliente_id=cliente_id))
 
         return render_template("clientes/form.html", cliente=cliente_atual, titulo="Editar cliente")
+
+    @app.post("/clientes/<int:cliente_id>/foto")
+    @login_required
+    def clientes_foto(cliente_id: int):
+        cliente = get_cliente_or_404(cliente_id)
+        db = get_db()
+        action = request.form.get("action", "").strip()
+
+        if action == "remover_foto":
+            db.execute("UPDATE clientes SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (cliente_id,))
+            db.execute("UPDATE clientes_acessos SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE cliente_id = ?", (cliente_id,))
+            registrar_auditoria(db, "cliente", cliente_id, "FOTO_REMOVIDA", f"Foto de perfil do cliente {cliente['nome']} removida pelo administrador.")
+            db.commit()
+            flash("Foto do cliente removida com sucesso.", "success")
+            return redirect(url_for("clientes_detalhe", cliente_id=cliente_id))
+
+        foto_file = request.files.get("foto")
+        if foto_file and foto_file.filename:
+            from image_utils import processar_foto_perfil, MAX_PROFILE_PHOTO_BYTES
+            raw = foto_file.read(MAX_PROFILE_PHOTO_BYTES + 1024)
+            if len(raw) > MAX_PROFILE_PHOTO_BYTES:
+                flash("O arquivo da foto não pode ultrapassar 1024 KB (1 MB). Escolha uma imagem menor.", "warning")
+                return redirect(url_for("clientes_detalhe", cliente_id=cliente_id))
+            try:
+                b64_foto = processar_foto_perfil(raw)
+                db.execute("UPDATE clientes SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (b64_foto, cliente_id))
+                db.execute("UPDATE clientes_acessos SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE cliente_id = ?", (b64_foto, cliente_id))
+                registrar_auditoria(db, "cliente", cliente_id, "FOTO_ATUALIZADA", f"Foto de perfil do cliente {cliente['nome']} atualizada pelo administrador.")
+                db.commit()
+                flash("Foto do cliente atualizada com sucesso!", "success")
+            except Exception as ex:
+                flash(f"Não foi possível processar a imagem da foto: {ex}", "danger")
+        else:
+            flash("Nenhuma foto selecionada.", "warning")
+
+        return redirect(url_for("clientes_detalhe", cliente_id=cliente_id))
 
     @app.post("/clientes/<int:cliente_id>/status")
     @login_required
@@ -6602,7 +6699,13 @@ def build_receivables_collection_message(
 
 def get_cliente_or_404(cliente_id: int) -> sqlite3.Row:
     cliente = get_db().execute(
-        "SELECT * FROM clientes WHERE id = ?",
+        """
+        SELECT c.*,
+               COALESCE(c.foto_perfil, ca.foto_perfil) AS foto_perfil
+          FROM clientes c
+          LEFT JOIN clientes_acessos ca ON ca.cliente_id = c.id
+         WHERE c.id = ?
+        """,
         (cliente_id,),
     ).fetchone()
 

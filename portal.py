@@ -37,32 +37,9 @@ MIN_PROOF_WIDTH = 180
 MIN_PROOF_HEIGHT = 180
 MAX_IMAGE_DIMENSION = 1800
 MAX_IMAGE_PIXELS = 20_000_000
-MAX_PROFILE_PHOTO_BYTES = 1024 * 1024  # 1024 KB (1 MB)
+from image_utils import processar_foto_perfil, MAX_PROFILE_PHOTO_BYTES
 
-
-def _processar_foto_perfil(data: bytes) -> str:
-    """Valida, faz corte quadrado centralizado 160x160 e gera base64 leve de foto de perfil."""
-    if not data or len(data) > MAX_PROFILE_PHOTO_BYTES:
-        raise ValueError("A foto de perfil deve ter no máximo 1024 KB (1 MB).")
-    try:
-        with Image.open(BytesIO(data), formats=("JPEG", "PNG", "WEBP")) as img:
-            img = ImageOps.exif_transpose(img)
-            if img.mode in {"RGBA", "LA"}:
-                rgba = img.convert("RGBA")
-                bg = Image.new("RGB", rgba.size, "white")
-                bg.paste(rgba, mask=rgba.getchannel("A"))
-                img = bg
-            elif img.mode != "RGB":
-                img = img.convert("RGB")
-
-            # Recorte inteligente centralizado 1:1 e redimensionamento proporcional
-            cropped = ImageOps.fit(img, (160, 160), Image.Resampling.LANCZOS)
-            buf = BytesIO()
-            cropped.save(buf, format="JPEG", quality=85, optimize=True)
-            encoded = base64.b64encode(buf.getvalue()).decode("ascii")
-            return f"data:image/jpeg;base64,{encoded}"
-    except (UnidentifiedImageError, OSError) as exc:
-        raise ValueError("Formato de imagem inválido para o perfil. Envie JPG, PNG ou WEBP.") from exc
+_processar_foto_perfil = processar_foto_perfil
 
 
 def init_schema() -> None:
@@ -130,6 +107,8 @@ def init_schema() -> None:
     add_column_if_missing(db, 'clientes_acessos', 'reset_token', 'TEXT')
     add_column_if_missing(db, 'clientes_acessos', 'reset_token_expira', 'TEXT')
     add_column_if_missing(db, 'clientes_acessos', 'foto_perfil', 'TEXT')
+    add_column_if_missing(db, 'clientes', 'foto_perfil', 'TEXT')
+    add_column_if_missing(db, 'usuarios', 'foto_perfil', 'TEXT')
     add_column_if_missing(db, 'comprovantes_pagamento', 'arquivo_base64', 'TEXT')
     try:
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_acessos_usuario ON clientes_acessos(usuario);")
@@ -960,6 +939,10 @@ def perfil():
                 "UPDATE clientes_acessos SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (aid,),
             )
+            db.execute(
+                "UPDATE clientes SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (cliente['id'],),
+            )
             registrar_auditoria(db, 'cliente_acesso', aid, 'FOTO_REMOVIDA', 'Cliente removeu a foto de perfil.')
             db.commit()
             flash('Foto de perfil removida com sucesso.', 'success')
@@ -978,6 +961,10 @@ def perfil():
                     db.execute(
                         "UPDATE clientes_acessos SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                         (b64_foto, aid),
+                    )
+                    db.execute(
+                        "UPDATE clientes SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (b64_foto, cliente['id']),
                     )
                     registrar_auditoria(db, 'cliente_acesso', aid, 'FOTO_ATUALIZADA', 'Cliente atualizou a foto de perfil.')
                     db.commit()
@@ -1800,6 +1787,7 @@ def admin_accesses():
         SELECT ca.id,ca.usuario,ca.email,ca.telefone_informado,ca.status,
                ca.contato_validado,ca.solicitado_at,ca.aprovado_at,
                ca.ultimo_login_at,ca.observacao_admin,
+               COALESCE(ca.foto_perfil, c.foto_perfil) AS foto_perfil,
                c.id cliente_id,c.nome cliente_nome,
                c.email email_cadastrado,c.telefone telefone_cadastrado
           FROM clientes_acessos ca
@@ -2001,7 +1989,9 @@ def edit_access(aid):
     db = get_db()
     access = db.execute(
         """
-        SELECT ca.*, c.nome AS cliente_nome, c.email AS email_cadastrado,
+        SELECT ca.*,
+               COALESCE(ca.foto_perfil, c.foto_perfil) AS foto_perfil,
+               c.nome AS cliente_nome, c.email AS email_cadastrado,
                c.telefone AS telefone_cadastrado
           FROM clientes_acessos ca
           JOIN clientes c ON c.id=ca.cliente_id
@@ -2027,6 +2017,34 @@ def edit_access(aid):
     }
 
     if request.method == 'POST':
+        action_foto = request.form.get('action_foto', '').strip()
+        if action_foto == 'remover_foto':
+            db.execute("UPDATE clientes_acessos SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (aid,))
+            db.execute("UPDATE clientes SET foto_perfil = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (access['cliente_id'],))
+            registrar_auditoria(db, 'cliente_acesso', aid, 'FOTO_REMOVIDA', f"Administrador removeu foto do cliente {access['cliente_nome']}.")
+            db.commit()
+            flash('Foto de perfil do cliente removida com sucesso.', 'success')
+            return redirect(url_for('portal.edit_access', aid=aid))
+
+        if action_foto == 'salvar_foto' or ('foto' in request.files and request.files['foto'].filename and not request.form.get('senha_confirmacao')):
+            foto_file = request.files.get('foto')
+            if foto_file and foto_file.filename:
+                raw = foto_file.read(MAX_PROFILE_PHOTO_BYTES + 1024)
+                if len(raw) > MAX_PROFILE_PHOTO_BYTES:
+                    flash('O arquivo da foto não pode ultrapassar 1024 KB (1 MB). Escolha uma imagem menor.', 'warning')
+                    return redirect(url_for('portal.edit_access', aid=aid))
+                try:
+                    b64_foto = processar_foto_perfil(raw)
+                    db.execute("UPDATE clientes_acessos SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (b64_foto, aid))
+                    db.execute("UPDATE clientes SET foto_perfil = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (b64_foto, access['cliente_id']))
+                    registrar_auditoria(db, 'cliente_acesso', aid, 'FOTO_ATUALIZADA', f"Administrador atualizou foto do cliente {access['cliente_nome']}.")
+                    db.commit()
+                    flash('Foto de perfil do cliente atualizada com sucesso!', 'success')
+                    return redirect(url_for('portal.edit_access', aid=aid))
+                except Exception as ex:
+                    flash(f'Não foi possível processar a imagem da foto: {ex}', 'danger')
+                    return redirect(url_for('portal.edit_access', aid=aid))
+
         usuario = form['usuario']
         email = form['email'].strip().lower()
         phone = only_digits(form['telefone'])

@@ -1,17 +1,121 @@
-{% extends 'base.html' %}{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
-{% block title %}Bem-vindo de volta{% endblock %}{% block content %}<header class="page-heading">
-<div>
-<p class="eyebrow">CONTROLE FINANCEIRO</p>
-<h1>Bem-vindo de volta</h1>
-</div>
-<div class="actions">
-</div>
+{% extends 'base.html' %}
+{% from '_macros.html' import field, select, table, csrf, banks, confirmation with context %}
+{% block title %}Acesse sua conta · Facilita{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <p class="eyebrow">FACILITA</p>
+    <h1>Acesse sua conta</h1>
+  </div>
+  <div class="actions">
+  </div>
 </header>
+
 <section class="panel auth-panel">
-<p class="muted">Organize contratos, recebimentos e clientes em um só lugar.</p>
-<form method="post">{{ csrf() }}{{ field('login','Login',request.form.get('login',''),required=true) }}{{ field('senha','Senha',type='password',required=true) }}<button class="button primary">Entrar</button>
-</form>
-<p>
-<a href="{{ url_for('portal.login') }}">Sou cliente →</a>
-</p>
-</section>{% endblock %}
+  <!-- Alternador de perfil (Cliente / Administrador) -->
+  <div class="login-tabs" role="tablist" aria-label="Selecione seu perfil de acesso">
+    <button type="button" 
+            id="tabBtnCliente" 
+            role="tab" 
+            aria-selected="{{ 'false' if tipo_login == 'admin' else 'true' }}" 
+            aria-controls="paneCliente" 
+            class="login-tab-btn {{ '' if tipo_login == 'admin' else 'active' }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      <span>Área do Cliente</span>
+    </button>
+
+    <button type="button" 
+            id="tabBtnAdmin" 
+            role="tab" 
+            aria-selected="{{ 'true' if tipo_login == 'admin' else 'false' }}" 
+            aria-controls="paneAdmin" 
+            class="login-tab-btn {{ 'active' if tipo_login == 'admin' else '' }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <span>Administrador</span>
+    </button>
+  </div>
+
+  <!-- Painel 1: Área do Cliente (Padrão) -->
+  <div id="paneCliente" role="tabpanel" aria-labelledby="tabBtnCliente" class="login-tab-pane {{ '' if tipo_login == 'admin' else 'active' }}">
+    <p class="muted" style="margin-bottom: 16px;">Consulte seus contratos e acompanhe seus pagamentos.</p>
+    
+    <form method="post" action="{{ url_for('portal.login') }}">
+      {{ csrf() }}
+      <input type="hidden" name="next" value="{{ request.args.get('next') or request.form.get('next') or '' }}">
+      {{ field('login', 'E-mail ou Usuário', (login if tipo_login != 'admin' else '') or request.form.get('login', request.form.get('email', '')), type='text', required=true) }}
+      {{ field('senha', 'Senha', type='password', required=true) }}
+      
+      <div style="display:flex; justify-content:flex-end; margin-top:-6px; margin-bottom:16px;">
+        <a href="{{ url_for('portal.recuperar_senha') }}" style="font-size:0.875rem; color:var(--brand, #0052cc); font-weight:550;">Esqueceu a senha?</a>
+      </div>
+
+      <button class="button primary" style="width:100%;">Entrar como Cliente</button>
+    </form>
+
+    <div style="margin-top:20px; padding-top:14px; border-top:1px solid var(--line, #dfe1e6); display:flex; justify-content:space-between; align-items:center; font-size:0.875rem;">
+      <span class="muted">Ainda não tem acesso?</span>
+      <a href="{{ url_for('portal.register') }}" style="font-weight:600;">Solicitar acesso</a>
+    </div>
+  </div>
+
+  <!-- Painel 2: Administrador -->
+  <div id="paneAdmin" role="tabpanel" aria-labelledby="tabBtnAdmin" class="login-tab-pane {{ 'active' if tipo_login == 'admin' else '' }}">
+    <p class="muted" style="margin-bottom: 16px;">Acesso restrito para gestão financeira e operacional.</p>
+    
+    <form method="post" action="{{ url_for('login') }}">
+      {{ csrf() }}
+      <input type="hidden" name="next" value="{{ request.args.get('next') or request.form.get('next') or '' }}">
+      {{ field('login', 'Login de Administrador', (login if tipo_login == 'admin' else '') or request.form.get('login', ''), type='text', required=true) }}
+      {{ field('senha', 'Senha', type='password', required=true) }}
+      
+      <div style="margin-top: 14px;">
+        <button class="button primary" style="width:100%;">Entrar como Administrador</button>
+      </div>
+    </form>
+
+    <div style="margin-top:20px; padding-top:14px; border-top:1px solid var(--line, #dfe1e6); display:flex; justify-content:center; align-items:center; font-size:0.875rem;">
+      <button type="button" class="button-link" style="background:none; border:none; color:var(--muted); cursor:pointer; text-decoration:underline;" onclick="document.getElementById('tabBtnCliente').click()">
+        ← Voltar para login de cliente
+      </button>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function() {
+    const tabCliente = document.getElementById('tabBtnCliente');
+    const tabAdmin = document.getElementById('tabBtnAdmin');
+    const paneCliente = document.getElementById('paneCliente');
+    const paneAdmin = document.getElementById('paneAdmin');
+
+    function selectTab(tipo) {
+      if (tipo === 'admin') {
+        tabAdmin.classList.add('active');
+        tabAdmin.setAttribute('aria-selected', 'true');
+        tabCliente.classList.remove('active');
+        tabCliente.setAttribute('aria-selected', 'false');
+        paneAdmin.classList.add('active');
+        paneCliente.classList.remove('active');
+      } else {
+        tabCliente.classList.add('active');
+        tabCliente.setAttribute('aria-selected', 'true');
+        tabAdmin.classList.remove('active');
+        tabAdmin.setAttribute('aria-selected', 'false');
+        paneCliente.classList.add('active');
+        paneAdmin.classList.remove('active');
+      }
+    }
+
+    if (tabCliente && tabAdmin) {
+      tabCliente.addEventListener('click', function() { selectTab('cliente'); });
+      tabAdmin.addEventListener('click', function() { selectTab('admin'); });
+    }
+  })();
+</script>
+{% endblock %}

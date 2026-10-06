@@ -2020,3 +2020,88 @@ td:last-child { overflow-wrap: anywhere; max-width: 500px; }
   border: 1px solid var(--line);
 }
 
+/* ==========================================================================
+   Miniaturas de Avatar para Tabelas (Clientes e Acessos ao Portal)
+   ========================================================================== */
+.client-cell-with-avatar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  vertical-align: middle;
+}
+
+.client-avatar-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  display: block;
+}
+
+.client-avatar-thumb-fallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--brand-light, rgba(30, 64, 175, 0.1));
+  color: var(--brand, #1e40af);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+}
+
+/* ==========================================================================
+   Tabs / Alternador de Login Unificado (Cliente / Administrador)
+   ========================================================================== */
+.login-tabs {
+  display: flex;
+  background: var(--surface-alt, #f3f4f6);
+  padding: 4px;
+  border-radius: var(--radius, 8px);
+  margin-bottom: 20px;
+  gap: 4px;
+  border: 1px solid var(--line, #e5e7eb);
+}
+
+.login-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--muted, #64748b);
+  font-size: 0.9rem;
+  font-weight: 550;
+  border-radius: calc(var(--radius, 8px) - 2px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.login-tab-btn:hover {
+  color: var(--ink, #0f172a);
+}
+
+.login-tab-btn.active {
+  background: var(--surface, #ffffff);
+  color: var(--brand, #1e40af);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+}
+
+.login-tab-pane {
+  display: none;
+}
+
+.login-tab-pane.active {
+  display: block;
+}
+

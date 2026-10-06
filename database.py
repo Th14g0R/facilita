@@ -358,6 +358,7 @@ def init_db() -> None:
             login TEXT NOT NULL UNIQUE,
             senha_hash TEXT NOT NULL,
             ativo INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0, 1)),
+            foto_perfil TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
@@ -373,6 +374,7 @@ def init_db() -> None:
             estado TEXT,
             cep TEXT,
             observacoes TEXT,
+            foto_perfil TEXT,
             ativo INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0, 1)),
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -806,6 +808,8 @@ def migrate_schema(db: sqlite3.Connection) -> None:
     )
     add_column_if_missing(db, "usuarios", "tentativas_falhas", "INTEGER NOT NULL DEFAULT 0")
     add_column_if_missing(db, "usuarios", "bloqueado_ate", "TEXT")
+    add_column_if_missing(db, "usuarios", "foto_perfil", "TEXT")
+    add_column_if_missing(db, "clientes", "foto_perfil", "TEXT")
     add_column_if_missing(db, "cartoes_credito", "dia_vencimento", "INTEGER")
     add_column_if_missing(db, "lancamentos_cartao", "usuario_id", "INTEGER")
     add_column_if_missing(db, "parcelas_cartao", "conta_origem_id", "INTEGER")

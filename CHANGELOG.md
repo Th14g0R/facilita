@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.5.0 — 2026-10-06
+
+- **Visualização e Edição de Fotos de Clientes pelo Administrador**:
+  - Exibição de foto do cliente em tamanho real/destaque na tela de detalhes do cliente (`/clientes/<id>`), no formulário de edição do cliente (`/clientes/<id>/editar`) e na gestão de credencial (`/acessos-clientes/<id>/editar`).
+  - Permissão para o administrador realizar upload de nova foto ou remover a foto existente do cliente diretamente da tela de detalhes ou do formulário.
+  - Sincronização automática e bidirecional da foto entre a tabela de clientes (`clientes.foto_perfil`) e a tabela de acessos (`clientes_acessos.foto_perfil`), garantindo que tanto fotos enviadas pelo cliente quanto pelo administrador fiquem integradas.
+- **Miniaturas de Fotos dos Clientes nas Tabelas de Listagem**:
+  - Exibição de foto circular em miniatura (32x32px) com fallback elegante de iniciais na listagem geral de clientes (`/clientes`) e na listagem de acessos do portal (`/acessos-clientes`).
+- **Edição da Foto de Perfil do Administrador**:
+  - Campo e visualizador de foto de perfil incorporados na tela do administrador (`/perfil`), permitindo envio de imagem e remoção.
+  - Exibição da foto do administrador logado na barra de navegação/menu lateral (`sidebar-footer`).
+  - Módulo reutilizável `image_utils.py` com compressão e corte quadrado centralizado 160x160 a 85% de qualidade em JPEG para evitar consumo de dados.
+- **Tela de Login Unificada e Moderna**:
+  - Alternador intuitivo de perfil (Área do Cliente vs. Administrador) com abas (segmented control) acessíveis e responsivas.
+  - Seleção padrão na "Área do Cliente" tanto em `/login` quanto em `/portal/login`, com alternância imediata para "Administrador" com um clique.
+  - Eliminação do link redundante de recuperação de senha: mantido apenas um link claro e direto ("Esqueceu a senha?").
+  - Identificação de marca no topo atualizada para "FACILITA".
+- **Suíte de Testes Automatizados**: ampliação para 204 testes unitários com 100% de sucesso.
+
 ## 2.4.6 — 2026-10-05
 
 - **Ordenação Crescente por Competência no Extrato do Cliente**:
