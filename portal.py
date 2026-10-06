@@ -317,9 +317,9 @@ def validate_file(storage):
 def card_summaries(client_id: int):
     db = get_db()
     refresh_overdue_card_installments(db)
-    return db.execute("""
-        SELECT cc.id, cc.descricao, cc.ativo,
-               COALESCE(cc.dia_vencimento, CAST(SUBSTR(MIN(pc.vencimento), 9, 2) AS INTEGER)) AS dia_vencimento,
+    rows = db.execute("""
+        SELECT cc.id, cc.descricao, cc.ativo, cc.dia_vencimento,
+               MIN(pc.vencimento) AS primeiro_vencimento,
                COALESCE(SUM(pc.valor_centavos), 0) AS total_parcelado_centavos,
                COALESCE(SUM(pc.valor_centavos), 0) AS total_centavos,
                COUNT(pc.id) AS parcelas_totais,
@@ -337,11 +337,24 @@ def card_summaries(client_id: int):
          ORDER BY cc.ativo DESC, cc.id DESC
     """, (client_id,)).fetchall()
 
+    cards = []
+    for r in rows:
+        c = dict(r)
+        if not c.get('dia_vencimento') and c.get('primeiro_vencimento'):
+            try:
+                v_str = str(c['primeiro_vencimento'])
+                if len(v_str) >= 10:
+                    c['dia_vencimento'] = int(v_str[8:10])
+            except Exception:
+                pass
+        cards.append(c)
+    return cards
+
 
 def client_card_purchases(client_id: int):
-    """Retorna todas as compras realizadas nos cartões vinculados ao cliente."""
+    """Retorna todas as compras realizadas nos cartões vinculados ao cliente (ativas no topo, quitadas abaixo)."""
     db = get_db()
-    return db.execute("""
+    rows = db.execute("""
         SELECT lc.id, lc.cartao_credito_id, cc.descricao AS cartao_descricao,
                lc.descricao AS compra_descricao, lc.valor_total_centavos,
                lc.quantidade_parcelas, lc.data_compra,
@@ -377,27 +390,20 @@ def client_card_purchases(client_id: int):
           FROM lancamentos_cartao lc
           JOIN cartoes_credito cc ON cc.id = lc.cartao_credito_id
          WHERE cc.cliente_id = ?
-         ORDER BY
-               -- Compras com parcelas ativas (em aberto ou vencidas) no topo, compras 100% pagas abaixo
-               CASE
-                   WHEN (
-                       SELECT COUNT(*)
-                         FROM parcelas_cartao pc
-                        WHERE pc.lancamento_cartao_id = lc.id
-                          AND pc.status IN ('PENDENTE', 'VENCIDO')
-                   ) > 0 THEN 0
-                   ELSE 1
-               END,
-               lc.data_compra DESC,
-               lc.id DESC
+         ORDER BY lc.data_compra DESC, lc.id DESC
     """, (client_id,)).fetchall()
+
+    compras = [dict(r) for r in rows]
+    compras_ativas = [c for c in compras if int(c.get('parcelas_abertas') or 0) > 0]
+    compras_pagas = [c for c in compras if int(c.get('parcelas_abertas') or 0) == 0]
+    return compras_ativas + compras_pagas
 
 
 def client_card_installments(client_id: int):
     """Retorna todas as parcelas dos cartões do cliente, agrupadas por compra (ativas no topo, quitadas abaixo) e ordenadas por parcela/vencimento."""
     db = get_db()
     refresh_overdue_card_installments(db)
-    return db.execute("""
+    rows = db.execute("""
         SELECT pc.id, pc.numero_parcela, pc.valor_centavos, pc.vencimento,
                pc.data_pagamento, pc.status,
                lc.id AS lancamento_cartao_id,
@@ -408,25 +414,28 @@ def client_card_installments(client_id: int):
           JOIN lancamentos_cartao lc ON lc.id = pc.lancamento_cartao_id
           JOIN cartoes_credito cc ON cc.id = lc.cartao_credito_id
          WHERE cc.cliente_id = ?
-         ORDER BY
-               -- 1. Compras com parcelas ativas (PENDENTE ou VENCIDO) vêm primeiro (0); compras com todas pagas vão para o fim (1)
-               CASE
-                   WHEN (
-                       SELECT COUNT(*)
-                         FROM parcelas_cartao sub
-                        WHERE sub.lancamento_cartao_id = lc.id
-                          AND sub.status != 'PAGO'
-                   ) > 0 THEN 0
-                   ELSE 1
-               END,
-               -- 2. Compra: mais recentes primeiro
-               lc.data_compra DESC,
-               lc.id DESC,
-               -- 3. Parcela dentro da compra: da 1ª à última por número da parcela ou vencimento
-               pc.numero_parcela ASC,
-               pc.vencimento ASC,
-               pc.id ASC
+         ORDER BY lc.data_compra DESC, lc.id DESC, pc.numero_parcela ASC, pc.vencimento ASC, pc.id ASC
     """, (client_id,)).fetchall()
+
+    parcelas = [dict(r) for r in rows]
+
+    # Identifica compras que possuem pelo menos 1 parcela não paga (ativa)
+    compras_ativas_ids = set()
+    for p in parcelas:
+        if str(p.get('status') or '').upper() != 'PAGO':
+            compras_ativas_ids.add(p.get('lancamento_cartao_id'))
+
+    def ordenar_parcela(p):
+        cid = p.get('lancamento_cartao_id')
+        prioridade_ativa = 0 if cid in compras_ativas_ids else 1
+        cid_val = int(cid) if isinstance(cid, int) else 0
+        num_p = int(p.get('numero_parcela') or 0)
+        venc = str(p.get('vencimento') or '')
+        pid = int(p.get('id') or 0)
+        return (prioridade_ativa, -cid_val, num_p, venc, pid)
+
+    parcelas.sort(key=ordenar_parcela)
+    return parcelas
 
 
 @bp.before_app_request
@@ -1440,7 +1449,7 @@ def statement():
         title_params.append(end_date.isoformat())
 
     title_sql += """
-        ORDER BY t.data_vencimento DESC, e.id DESC, t.id DESC
+        ORDER BY t.competencia ASC, t.data_vencimento ASC, e.id ASC, t.id ASC
     """
 
     title_rows = db.execute(

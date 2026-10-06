@@ -190,8 +190,14 @@ def create_app() -> Flask:
         from werkzeug.exceptions import HTTPException
         if isinstance(e, HTTPException) and e.code != 500:
             return e
-        import traceback
+        import sys, traceback
         tb = traceback.format_exc()
+        try:
+            sys.stderr.write(f"\n[ERRO 500] Rota: {request.path} | Exceção: {e}\n{tb}\n")
+            sys.stderr.flush()
+        except Exception:
+            pass
+        app.logger.error("Erro interno 500 em %s: %s\n%s", request.path, e, tb)
         is_debug = app.debug or env_bool("EMPRESTIMO_DEBUG", False)
         detalhes_html = (
             f"<pre style='background:#ffffff; padding:1rem; border-radius:6px; border:1px solid #fecaca; color:#991b1b; overflow:auto; font-size:13px; white-space:pre-wrap;'>{tb}\nExcecao: {e}</pre>"

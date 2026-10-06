@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.4.6 — 2026-10-05
+
+- **Ordenação Crescente por Competência no Extrato do Cliente**:
+  - Ajuste na ordenação da lista de títulos no extrato do cliente para ordem cronológica crescente de competência e vencimento (`t.competencia ASC, t.data_vencimento ASC`), atendendo à solicitação do usuário.
+- **Eliminação Definitiva de Erro 500 no Painel Inicial do Cliente (`/portal`)**:
+  - Remoção de `CAST` de data e de subconsultas complexas em cláusulas `ORDER BY` no PostgreSQL (Supabase).
+  - Consulta de cartões, compras e parcelas simplificada no SQL para máxima compatibilidade universal (PostgreSQL + SQLite) com agregação e ordenação inteligente executadas diretamente em Python.
+  - Logging detalhado com saída imediata em `stderr` e logger da aplicação para erros internos 500.
+- **Suíte de Testes Automatizados**: ampliação para 199 testes unitários com 100% de sucesso.
+
 ## 2.4.5 — 2026-10-05
 
 - **Ajustes e Otimização Visual do Extrato do Cliente**:

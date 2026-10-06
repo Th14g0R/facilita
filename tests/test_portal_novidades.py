@@ -335,6 +335,38 @@ class TestPortalNovidades(unittest.TestCase):
         self.assertNotIn("Total Histórico Pago", html)
         self.assertIn("Títulos", html)
 
+    def test_portal_extrato_ordem_crescente_competencia(self):
+        """Garante que a lista de títulos no extrato do cliente é exibida em ordem crescente de competência."""
+        self.authenticate_portal(1)
+        with self.app.app_context():
+            db = application.get_db()
+            db.execute("""
+                INSERT INTO emprestimos (
+                    id, cliente_id, descricao, data_emprestimo,
+                    valor_original_centavos, saldo_atual_centavos, taxa_juros_mensal,
+                    data_primeiro_vencimento, dia_vencimento, status
+                ) VALUES (20, 1, 'Operação Teste Ordem', '2026-01-01', 100000, 100000, 5.0, '2026-01-10', 10, 'ATIVO')
+            """)
+            db.execute("""
+                INSERT INTO titulos_receber (
+                    id, emprestimo_id, tipo, competencia, data_vencimento,
+                    valor_previsto_centavos, saldo_base_centavos, taxa_juros_mensal, status
+                ) VALUES
+                (201, 20, 'JUROS', '2026-03', '2026-03-10', 5000, 100000, 5.0, 'PREVISTO'),
+                (202, 20, 'JUROS', '2026-01', '2026-01-10', 5000, 100000, 5.0, 'RECEBIDO')
+            """)
+            db.commit()
+
+        resp = self.client.get('/portal/extrato')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+
+        pos_jan = html.find("01/2026")
+        pos_mar = html.find("03/2026")
+        self.assertTrue(pos_jan != -1 and pos_mar != -1)
+        # 01/2026 deve aparecer antes de 03/2026 (ordem crescente de competência)
+        self.assertLess(pos_jan, pos_mar)
+
     def test_portal_ordenacao_parcelas_cartao_compras_ativas_topo(self):
         """Garante que compras com parcelas ativas ficam no topo e compras 100% pagas ficam abaixo."""
         self.authenticate_portal(1)
