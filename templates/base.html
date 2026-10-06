@@ -15,6 +15,26 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Facilita">
 <title>{% block title %}Facilita{% endblock %} · Facilita</title>
+<meta name="description" content="{% block meta_description %}Facilita · Sistema discreto e seguro de gestão financeira, contratos e operações, recebimentos e portal do cliente.{% endblock %}">
+
+<!-- Open Graph / WhatsApp / Telegram / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Facilita">
+<meta property="og:title" content="{% block og_title %}Facilita · Sistema de Gestão Financeira{% endblock %}">
+<meta property="og:description" content="{% block og_description %}Sistema discreto e seguro de gestão financeira, contratos e operações, recebimentos e portal do cliente.{% endblock %}">
+<meta property="og:url" content="{{ request.base_url | replace('http://', 'https://') }}">
+<meta property="og:image" content="{{ url_for('static', filename='og-image.png', _external=True) | replace('http://', 'https://') }}">
+<meta property="og:image:secure_url" content="{{ url_for('static', filename='og-image.png', _external=True) | replace('http://', 'https://') }}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Facilita · Controle Financeiro">
+
+<!-- Twitter Cards -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{% block twitter_title %}Facilita · Sistema de Gestão Financeira{% endblock %}">
+<meta name="twitter:description" content="{% block twitter_description %}Sistema discreto e seguro de gestão financeira, contratos e operações, recebimentos e portal do cliente.{% endblock %}">
+<meta name="twitter:image" content="{{ url_for('static', filename='og-image.png', _external=True) | replace('http://', 'https://') }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">

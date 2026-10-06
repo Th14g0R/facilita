@@ -24,7 +24,10 @@
   - Atualização do `manifest.json` com os novos ícones para instalação como app mobile (PWA).
 - **Remoção de Arquivos Legados de Instalação Local**:
   - Exclusão dos scripts `.bat`, `.command`, `.ps1` e documentações de instalação desktop antigas, tornando o projeto 100% voltado para nuvem (Vercel Serverless + Supabase PostgreSQL).
-- **Suíte de Testes Automatizados**: 188 testes unitários passando com 100% de sucesso.
+- **Compartilhamento e Link Preview para WhatsApp e Telegram (Open Graph & Twitter Cards)**:
+  - Adição de metadados ricos Open Graph (`og:title`, `og:description`, `og:image`, `og:url`, `og:site_name`) e Twitter Cards (`summary_large_image`) em todas as páginas públicas e no template base.
+  - Geração de imagens otimizadas de alta resolução para redes sociais (`static/og-image.png` em 1200x630 e `static/og-image-square.png` em 600x600) com peso inferior a 150 KB para renderização instantânea no WhatsApp e Telegram.
+- **Suíte de Testes Automatizados**: ampliação para 189 testes unitários passando com 100% de sucesso.
 
 ## 2.4.6 — 2026-10-05
 

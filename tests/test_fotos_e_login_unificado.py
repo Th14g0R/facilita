@@ -229,3 +229,28 @@ class TestFotosELoginUnificado(unittest.TestCase):
         self.assertIn('Área do Cliente', html_portal)
         self.assertIn('Administrador', html_portal)
         self.assertIn('id="paneCliente" role="tabpanel" aria-labelledby="tabBtnCliente" class="login-tab-pane active"', html_portal)
+
+    def test_meta_tags_open_graph_whatsapp_telegram(self):
+        """Garante a presença das tags Open Graph e Twitter Cards para previews no WhatsApp/Telegram."""
+        res = self.client.get('/login')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Meta tags essenciais de Open Graph
+        self.assertIn('property="og:site_name" content="Facilita"', html)
+        self.assertIn('property="og:title"', html)
+        self.assertIn('property="og:description"', html)
+        self.assertIn('property="og:image"', html)
+        self.assertIn('/static/og-image.png', html)
+        self.assertIn('property="og:type" content="website"', html)
+
+        # Twitter Card
+        self.assertIn('name="twitter:card" content="summary_large_image"', html)
+        self.assertIn('name="twitter:image"', html)
+
+        # Existência física dos assets de imagem para redes sociais
+        static_dir = Path(__file__).resolve().parent.parent / 'static'
+        self.assertTrue((static_dir / 'og-image.png').is_file())
+        self.assertTrue((static_dir / 'og-image-square.png').is_file())
+        self.assertTrue((static_dir / 'logo.png').is_file())
+        self.assertTrue((static_dir / 'favicon.png').is_file())
