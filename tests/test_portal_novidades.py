@@ -272,7 +272,8 @@ class TestPortalNovidades(unittest.TestCase):
         self.assertIn("Total dos Contratos (2)", html)
         self.assertIn("Total Amortizado", html)
         self.assertIn("Quitados / Inativos (1)", html)
-        self.assertIn("Valor Líquido dos Contratos", html)
+        # Card redundante de valor líquido removido a pedido do usuário
+        self.assertNotIn("Valor Líquido dos Contratos", html)
 
         # Checar tabela de contratos com data e amortizado
         self.assertIn("Transferido ao cliente", html)
@@ -312,8 +313,8 @@ class TestPortalNovidades(unittest.TestCase):
         self.assertIn("Smartphone", html)
         self.assertIn("Modo somente leitura", html)
 
-    def test_portal_extrato_com_detalhamento_contratos(self):
-        """Testa que o extrato exibe o detalhamento de contratos e somatório de valores pagos."""
+    def test_portal_extrato_limpo_sem_redundancias(self):
+        """Testa que o extrato não exibe totalizadores repetidos nem detalhamento de contratos."""
         self.authenticate_portal(1)
         with self.app.app_context():
             db = application.get_db()
@@ -324,21 +325,57 @@ class TestPortalNovidades(unittest.TestCase):
                     data_primeiro_vencimento, dia_vencimento, status
                 ) VALUES (3, 1, 'Operação Veículo', '2026-03-01', 200000, 150000, 5.0, '2026-04-01', 1, 'ATIVO')
             """)
-            db.execute("""
-                INSERT INTO movimentacoes_emprestimo (
-                    id, emprestimo_id, tipo, data_movimento, valor_centavos,
-                    saldo_antes_centavos, saldo_depois_centavos
-                ) VALUES (3, 3, 'ABATIMENTO', '2026-04-01', 50000, 200000, 150000)
-            """)
             db.commit()
 
         resp = self.client.get('/portal/extrato')
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
-        self.assertIn("Detalhamento dos Contratos", html)
-        self.assertIn("Operação Veículo", html)
-        self.assertIn("Total Amortizado Pago", html)
-        self.assertIn("Total Histórico Pago", html)
+        # Totalizadores e detalhamento de contratos removidos do extrato
+        self.assertNotIn("Detalhamento dos Contratos", html)
+        self.assertNotIn("Total Histórico Pago", html)
+        self.assertIn("Títulos", html)
+
+    def test_portal_ordenacao_parcelas_cartao_compras_ativas_topo(self):
+        """Garante que compras com parcelas ativas ficam no topo e compras 100% pagas ficam abaixo."""
+        self.authenticate_portal(1)
+        with self.app.app_context():
+            db = application.get_db()
+            # Compra Antiga (100% paga)
+            db.execute("""
+                INSERT INTO cartoes_credito (id, cliente_id, descricao, dia_vencimento, ativo)
+                VALUES (10, 1, 'Mastercard Black', 5, 1)
+            """)
+            db.execute("""
+                INSERT INTO lancamentos_cartao (id, cartao_credito_id, descricao, valor_total_centavos, quantidade_parcelas, data_compra, usuario_id)
+                VALUES (10, 10, 'Passagem Aérea Paga', 10000, 1, '2026-01-01', 1)
+            """)
+            db.execute("""
+                INSERT INTO parcelas_cartao (id, lancamento_cartao_id, numero_parcela, valor_centavos, vencimento, data_pagamento, status)
+                VALUES (100, 10, 1, 10000, '2026-01-05', '2026-01-05', 'PAGO')
+            """)
+
+            # Compra Recente (com parcela ativa)
+            db.execute("""
+                INSERT INTO lancamentos_cartao (id, cartao_credito_id, descricao, valor_total_centavos, quantidade_parcelas, data_compra, usuario_id)
+                VALUES (11, 10, 'Geladeira Em Aberto', 20000, 2, '2026-09-01', 1)
+            """)
+            db.execute("""
+                INSERT INTO parcelas_cartao (id, lancamento_cartao_id, numero_parcela, valor_centavos, vencimento, status)
+                VALUES
+                (101, 11, 1, 10000, '2026-09-05', 'PAGO'),
+                (102, 11, 2, 10000, '2026-10-05', 'PENDENTE')
+            """)
+            db.commit()
+
+        resp = self.client.get('/portal')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+
+        pos_geladeira = html.find("Geladeira Em Aberto")
+        pos_passagem = html.find("Passagem Aérea Paga")
+        self.assertTrue(pos_geladeira != -1 and pos_passagem != -1)
+        # Compra com parcelas ativas ("Geladeira") deve aparecer antes da compra 100% quitada ("Passagem Aérea")
+        self.assertLess(pos_geladeira, pos_passagem)
 
     def test_portal_logout_get_e_post(self):
         """Testa que o logout do portal funciona tanto por GET quanto por POST."""

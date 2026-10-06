@@ -78,23 +78,6 @@
         <strong class="extrato-summary-val money">{{ metricas_contratos.quitados_centavos|money }}</strong>
       </div>
     </div>
-
-    <!-- Líquido Restante (Deduz os amortizados dos quitados e inativos) -->
-    <div class="extrato-summary-card" style="border-left: 4px solid #0284c7; grid-column: 1 / -1;">
-      <div class="extrato-summary-icon" style="background: rgba(2, 132, 199, 0.12); color: #0284c7;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="12" y1="1" x2="12" y2="23"></line>
-          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-        </svg>
-      </div>
-      <div>
-        <span class="extrato-summary-label">Valor Líquido dos Contratos (Total deduzido dos quitados e amortizados)</span>
-        <strong class="extrato-summary-val money" style="color: #0284c7;">{{ metricas_contratos.liquido_centavos|money }}</strong>
-        <span class="muted" style="display: block; font-size: 11.5px; margin-top: 2px;">
-          Amortizado em quitados: {{ metricas_contratos.quitados_amortizado_centavos|money }} · Saldo devedor principal ativo: {{ metricas_contratos.ativos_saldo_centavos|money }}
-        </span>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -383,8 +366,8 @@
       <table>
         <thead>
           <tr>
-            <th scope="col">Parcela</th>
             <th scope="col">Compra</th>
+            <th scope="col">Parcela</th>
             <th scope="col">Cartão</th>
             <th scope="col">Vencimento</th>
             <th scope="col">Situação</th>
@@ -394,8 +377,8 @@
         <tbody>
           {% for p in parcelas_cartao %}
             <tr>
-              <td><strong>{{ p.numero_parcela }}ª</strong> de {{ p.quantidade_parcelas }}</td>
               <td style="font-weight: 500;">{{ p.lancamento_descricao }}</td>
+              <td><strong>{{ p.numero_parcela }}ª</strong> de {{ p.quantidade_parcelas }}</td>
               <td><span class="muted">{{ p.cartao_descricao }}</span></td>
               <td>{{ p.vencimento|date_br }}</td>
               <td>

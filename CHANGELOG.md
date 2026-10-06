@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.4.5 — 2026-10-05
+
+- **Ajustes e Otimização Visual do Extrato do Cliente**:
+  - Remoção dos totalizadores duplicados abaixo do filtro e da tabela de detalhamento dos contratos na tela de extrato do cliente, mantendo o foco exclusivo em Títulos e Movimentações históricas.
+- **Painel "Minha Visão Geral" do Cliente**:
+  - Remoção do card redundante de "Valor Líquido dos Contratos", mantendo a grade limpa com os 4 indicadores essenciais: Total dos Contratos, Ativos com Saldo Restante, Total Amortizado e Quitados/Inativos.
+- **Ordenação Inteligente de Compras e Parcelas dos Cartões de Crédito**:
+  - Nova regra de ordenação nas parcelas de cartões de crédito do cliente: compras com parcelas ativas (em aberto ou vencidas) priorizadas no topo da lista.
+  - Compras 100% quitadas/pagas agrupadas e posicionadas automaticamente no final da listagem.
+  - Parcelas agrupadas por compra e ordenadas da primeira à última parcela por vencimento e número de parcela.
+  - Reorganização da tabela de parcelas com a coluna "Compra" na primeira posição para leitura imediata.
+- **Suíte de Testes Automatizados**: ampliação para 198 testes unitários automatizados com 100% de sucesso.
+
 ## 2.4.4 — 2026-10-05
 
 - **Compatibilidade PostgreSQL (Supabase) vs SQLite em Cálculos de Contratos**:

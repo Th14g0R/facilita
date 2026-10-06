@@ -377,27 +377,55 @@ def client_card_purchases(client_id: int):
           FROM lancamentos_cartao lc
           JOIN cartoes_credito cc ON cc.id = lc.cartao_credito_id
          WHERE cc.cliente_id = ?
-         ORDER BY lc.data_compra DESC, lc.id DESC
+         ORDER BY
+               -- Compras com parcelas ativas (em aberto ou vencidas) no topo, compras 100% pagas abaixo
+               CASE
+                   WHEN (
+                       SELECT COUNT(*)
+                         FROM parcelas_cartao pc
+                        WHERE pc.lancamento_cartao_id = lc.id
+                          AND pc.status IN ('PENDENTE', 'VENCIDO')
+                   ) > 0 THEN 0
+                   ELSE 1
+               END,
+               lc.data_compra DESC,
+               lc.id DESC
     """, (client_id,)).fetchall()
 
 
 def client_card_installments(client_id: int):
-    """Retorna todas as parcelas dos cartões do cliente, ordenadas por prioridade de vencimento."""
+    """Retorna todas as parcelas dos cartões do cliente, agrupadas por compra (ativas no topo, quitadas abaixo) e ordenadas por parcela/vencimento."""
     db = get_db()
     refresh_overdue_card_installments(db)
     return db.execute("""
         SELECT pc.id, pc.numero_parcela, pc.valor_centavos, pc.vencimento,
                pc.data_pagamento, pc.status,
+               lc.id AS lancamento_cartao_id,
                lc.descricao AS lancamento_descricao, lc.quantidade_parcelas,
+               lc.data_compra,
                cc.descricao AS cartao_descricao, cc.id AS cartao_credito_id
           FROM parcelas_cartao pc
           JOIN lancamentos_cartao lc ON lc.id = pc.lancamento_cartao_id
           JOIN cartoes_credito cc ON cc.id = lc.cartao_credito_id
          WHERE cc.cliente_id = ?
          ORDER BY
-               CASE WHEN pc.status = 'VENCIDO' THEN 0 WHEN pc.status = 'PENDENTE' THEN 1 ELSE 2 END,
-               pc.vencimento,
-               pc.id
+               -- 1. Compras com parcelas ativas (PENDENTE ou VENCIDO) vêm primeiro (0); compras com todas pagas vão para o fim (1)
+               CASE
+                   WHEN (
+                       SELECT COUNT(*)
+                         FROM parcelas_cartao sub
+                        WHERE sub.lancamento_cartao_id = lc.id
+                          AND sub.status != 'PAGO'
+                   ) > 0 THEN 0
+                   ELSE 1
+               END,
+               -- 2. Compra: mais recentes primeiro
+               lc.data_compra DESC,
+               lc.id DESC,
+               -- 3. Parcela dentro da compra: da 1ª à última por número da parcela ou vencimento
+               pc.numero_parcela ASC,
+               pc.vencimento ASC,
+               pc.id ASC
     """, (client_id,)).fetchall()
 
 
